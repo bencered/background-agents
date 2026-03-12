@@ -8,8 +8,11 @@ import {
   updateMcpServer,
   deleteMcpServer,
 } from "@/hooks/use-mcp-servers";
+import { useRepos } from "@/hooks/use-repos";
 import { PlusIcon, TerminalIcon, GlobeIcon, ErrorIcon } from "@/components/ui/icons";
 import { Button } from "@/components/ui/button";
+
+type ScopeMode = "global" | "selected";
 
 type FormState = {
   name: string;
@@ -17,7 +20,8 @@ type FormState = {
   command: string;
   url: string;
   env: string;
-  repoScope: string;
+  repoScopes: string[];
+  scopeMode: ScopeMode;
   enabled: boolean;
 };
 
@@ -27,7 +31,8 @@ const emptyForm: FormState = {
   command: "",
   url: "",
   env: "",
-  repoScope: "",
+  repoScopes: [],
+  scopeMode: "global",
   enabled: true,
 };
 
@@ -40,7 +45,8 @@ function configToForm(config: McpServerConfig): FormState {
     env: config.env && Object.keys(config.env).length > 0
       ? Object.entries(config.env).map(([k, v]) => `${k}=${v}`).join("\n")
       : "",
-    repoScope: config.repoScope ?? "",
+    repoScopes: config.repoScope ? [config.repoScope] : [],
+    scopeMode: config.repoScope ? "selected" : "global",
     enabled: config.enabled,
   };
 }
@@ -64,6 +70,7 @@ function parseCommand(cmd: string): string[] {
 
 export function McpServersSettings() {
   const { servers, loading, mutate } = useMcpServers();
+  const { repos, loading: loadingRepos } = useRepos();
   const [editing, setEditing] = useState<string | "new" | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [error, setError] = useState<string | null>(null);
@@ -108,7 +115,9 @@ export function McpServersSettings() {
         name: form.name.trim(),
         type: form.type,
         enabled: form.enabled,
-        repoScope: form.repoScope.trim() || null,
+        repoScope: form.scopeMode === "selected" && form.repoScopes.length > 0
+          ? form.repoScopes[0]
+          : null,
         env: parseEnv(form.env),
       };
 
@@ -257,16 +266,76 @@ export function McpServersSettings() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1">
-              Repository Scope <span className="text-muted-foreground font-normal">(optional)</span>
-            </label>
-            <input
-              type="text"
-              value={form.repoScope}
-              onChange={(e) => setForm({ ...form, repoScope: e.target.value })}
-              placeholder="owner/repo (leave empty for global)"
-              className="w-full px-3 py-2 text-sm border border-border bg-input text-foreground rounded-sm focus:outline-none focus:border-foreground/30"
-            />
+            <label className="block text-sm font-medium text-foreground mb-2">Availability</label>
+            <div className="space-y-2 mb-2">
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="scope-mode"
+                  checked={form.scopeMode === "global"}
+                  onChange={() => setForm({ ...form, scopeMode: "global", repoScopes: [] })}
+                  className="mt-0.5"
+                />
+                <div>
+                  <span className="text-sm text-foreground">All repositories</span>
+                  <p className="text-xs text-muted-foreground">Available in every agent session</p>
+                </div>
+              </label>
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="scope-mode"
+                  checked={form.scopeMode === "selected"}
+                  onChange={() => setForm({ ...form, scopeMode: "selected" })}
+                  className="mt-0.5"
+                />
+                <div>
+                  <span className="text-sm text-foreground">Selected repositories only</span>
+                  <p className="text-xs text-muted-foreground">Only available in sessions for the chosen repo</p>
+                </div>
+              </label>
+            </div>
+
+            {form.scopeMode === "selected" && (
+              <>
+                {loadingRepos ? (
+                  <p className="text-sm text-muted-foreground px-3 py-2">Loading repositories...</p>
+                ) : repos.length === 0 ? (
+                  <p className="text-sm text-muted-foreground px-3 py-2 border border-border rounded-sm">
+                    No repositories available. Connect a GitHub integration first.
+                  </p>
+                ) : (
+                  <div className="border border-border max-h-40 overflow-y-auto rounded-sm">
+                    {repos.map((repo) => {
+                      const fullName = repo.fullName.toLowerCase();
+                      const isChecked = form.repoScopes.includes(fullName);
+                      return (
+                        <label
+                          key={repo.fullName}
+                          className="flex items-center gap-2 px-3 py-2 hover:bg-muted/50 transition cursor-pointer text-sm"
+                        >
+                          <input
+                            type="radio"
+                            name="repo-scope"
+                            checked={isChecked}
+                            onChange={() => setForm({ ...form, repoScopes: [fullName] })}
+                          />
+                          <span className="text-foreground">{repo.fullName}</span>
+                          {repo.private && (
+                            <span className="text-xs text-muted-foreground">private</span>
+                          )}
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+                {form.repoScopes.length === 0 && repos.length > 0 && (
+                  <p className="text-xs text-amber-500 mt-1">
+                    Select a repository or switch to &quot;All repositories&quot;.
+                  </p>
+                )}
+              </>
+            )}
           </div>
 
           <div className="flex items-center gap-2">
@@ -325,8 +394,10 @@ export function McpServersSettings() {
                     {server.type === "remote"
                       ? server.url
                       : server.command?.join(" ")}
-                    {server.repoScope && (
+                    {server.repoScope ? (
                       <span className="ml-2 text-accent">• {server.repoScope}</span>
+                    ) : (
+                      <span className="ml-2 text-muted-foreground/60">• global</span>
                     )}
                   </div>
                 </div>
