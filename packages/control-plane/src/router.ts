@@ -39,6 +39,7 @@ import { reposRoutes } from "./routes/repos";
 import { repoImageRoutes } from "./routes/repo-images";
 import { secretsRoutes } from "./routes/secrets";
 import { automationRoutes } from "./routes/automations";
+import { mcpServerRoutes } from "./routes/mcp-servers";
 
 const logger = createLogger("router");
 
@@ -441,6 +442,9 @@ const routes: Route[] = [
 
   // Automations
   ...automationRoutes,
+
+  // MCP servers
+  ...mcpServerRoutes,
 ];
 
 /**

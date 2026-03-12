@@ -38,6 +38,7 @@ export interface CreateSandboxRequest {
   repoImageSha?: string | null;
   timeoutSeconds?: number;
   branch?: string;
+  mcpServers?: import("@open-inspect/shared").McpServerConfig[];
 }
 
 export interface CreateSandboxResponse {
@@ -244,6 +245,7 @@ export class ModalClient {
           repo_image_sha: request.repoImageSha || null,
           timeout_seconds: request.timeoutSeconds || null,
           branch: request.branch || null,
+          mcp_servers: request.mcpServers || null,
         }),
       });
 

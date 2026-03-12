@@ -31,6 +31,7 @@ import {
 import { extractProviderAndModel } from "../../utils/models";
 import { createLogger, type Logger } from "../../logger";
 import { hashToken } from "../../auth/crypto";
+import { McpServerStore } from "../../db/mcp-servers";
 
 const log = createLogger("lifecycle-manager");
 
@@ -135,6 +136,8 @@ export interface SandboxLifecycleConfig {
   model: string;
   /** Session ID for log correlation. Optional — logs will omit sessionId if not provided. */
   sessionId?: string;
+  /** D1 database for loading MCP servers. */
+  db?: D1Database;
 }
 
 /**
@@ -359,6 +362,16 @@ export class SandboxLifecycleManager {
       const timeoutSeconds =
         session.spawn_source === "agent" ? CHILD_SANDBOX_TIMEOUT_SECONDS : undefined;
 
+      // Load MCP servers for this repo
+      let mcpServers;
+      try {
+        if (!this.config.db) throw new Error("DB not configured");
+        const mcpStore = new McpServerStore(this.config.db);
+        mcpServers = await mcpStore.getForSession(session.repo_owner, session.repo_name);
+      } catch (err) {
+        this.log.warn("Failed to load MCP servers", { event: "mcp.load_failed", error: String(err) });
+      }
+
       // Create sandbox via provider
       const createConfig: CreateSandboxConfig = {
         sessionId,
@@ -374,6 +387,7 @@ export class SandboxLifecycleManager {
         repoImageSha,
         timeoutSeconds,
         branch: session.base_branch,
+        mcpServers: mcpServers?.length ? mcpServers : undefined,
       };
 
       const result = await this.provider.createSandbox(createConfig);

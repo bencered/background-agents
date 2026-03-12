@@ -57,6 +57,8 @@ export interface CreateSandboxConfig {
   timeoutSeconds?: number;
   /** Git branch to work on (defaults to repo's default branch) */
   branch?: string;
+  /** MCP servers to inject into the agent session */
+  mcpServers?: import("@open-inspect/shared").McpServerConfig[];
 }
 
 /**

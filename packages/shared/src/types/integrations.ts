@@ -40,6 +40,18 @@ export interface IntegrationSettingsMap {
 export type GitHubGlobalConfig = IntegrationSettingsMap["github"]["global"];
 export type LinearGlobalConfig = IntegrationSettingsMap["linear"]["global"];
 
+/** MCP server configuration. */
+export interface McpServerConfig {
+  id: string;
+  name: string;
+  type: "stdio" | "remote";
+  command?: string[];
+  url?: string;
+  env?: Record<string, string>;
+  repoScope?: string | null;
+  enabled: boolean;
+}
+
 export const INTEGRATION_DEFINITIONS: {
   id: IntegrationId;
   name: string;

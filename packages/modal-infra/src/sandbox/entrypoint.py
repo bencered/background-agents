@@ -334,7 +334,7 @@ class SandboxSupervisor:
         # Model format is "provider/model", e.g. "anthropic/claude-sonnet-4-6"
         provider = self.session_config.get("provider", "anthropic")
         model = self.session_config.get("model", "claude-sonnet-4-6")
-        opencode_config = {
+        opencode_config: dict = {
             "model": f"{provider}/{model}",
             "permission": {
                 "*": {
@@ -342,6 +342,26 @@ class SandboxSupervisor:
                 },
             },
         }
+
+        # Inject MCP servers if configured
+        mcp_servers = self.session_config.get("mcp_servers")
+        if mcp_servers:
+            mcp_config = {}
+            for server in mcp_servers:
+                name = server.get("name", "")
+                if not name:
+                    continue
+                if server.get("type") == "remote":
+                    mcp_config[name] = {"type": "remote", "url": server.get("url", "")}
+                else:
+                    cmd = server.get("command", [])
+                    entry: dict = {"command": cmd}
+                    if server.get("env"):
+                        entry["env"] = server["env"]
+                    mcp_config[name] = entry
+            if mcp_config:
+                opencode_config["mcpServers"] = mcp_config
+                self.log.info("mcp.servers_configured", count=len(mcp_config))
 
         # Determine working directory - use repo path if cloned, otherwise /workspace
         workdir = self.workspace_path
