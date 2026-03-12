@@ -18,6 +18,15 @@ interface McpServerRow {
 }
 
 function rowToConfig(row: McpServerRow): McpServerConfig {
+  let repoScopes: string[] | null = null;
+  if (row.repo_scope) {
+    try {
+      const parsed = JSON.parse(row.repo_scope);
+      repoScopes = Array.isArray(parsed) ? parsed : [row.repo_scope];
+    } catch {
+      repoScopes = [row.repo_scope];
+    }
+  }
   return {
     id: row.id,
     name: row.name,
@@ -25,7 +34,7 @@ function rowToConfig(row: McpServerRow): McpServerConfig {
     command: row.command ? JSON.parse(row.command) : undefined,
     url: row.url ?? undefined,
     env: JSON.parse(row.env),
-    repoScope: row.repo_scope,
+    repoScopes,
     enabled: row.enabled === 1,
   };
 }
@@ -77,7 +86,7 @@ export class McpServerStore {
         config.command ? JSON.stringify(config.command) : null,
         config.url ?? null,
         JSON.stringify(config.env ?? {}),
-        config.repoScope ?? null,
+        config.repoScopes?.length ? JSON.stringify(config.repoScopes.map(r => r.toLowerCase())) : null,
         config.enabled ? 1 : 0,
         now,
         now
@@ -105,7 +114,7 @@ export class McpServerStore {
         merged.command ? JSON.stringify(merged.command) : null,
         merged.url ?? null,
         JSON.stringify(merged.env ?? {}),
-        merged.repoScope ?? null,
+        merged.repoScopes?.length ? JSON.stringify(merged.repoScopes.map(r => r.toLowerCase())) : null,
         merged.enabled ? 1 : 0,
         now,
         id
@@ -126,12 +135,22 @@ export class McpServerStore {
   /** Get all enabled MCP servers applicable to a session (global + repo-specific). */
   async getForSession(repoOwner: string, repoName: string): Promise<McpServerConfig[]> {
     const repoFullName = `${repoOwner}/${repoName}`.toLowerCase();
+    // D1 SQLite doesn't have JSON functions, so we fetch all enabled servers
+    // and filter in JS for repo_scope matching
     const { results } = await this.db
-      .prepare(
-        "SELECT * FROM mcp_servers WHERE enabled = 1 AND (repo_scope IS NULL OR LOWER(repo_scope) = ?) ORDER BY name"
-      )
-      .bind(repoFullName)
+      .prepare("SELECT * FROM mcp_servers WHERE enabled = 1 ORDER BY name")
       .all<McpServerRow>();
-    return results.map(rowToConfig);
+
+    return results
+      .filter((row) => {
+        if (!row.repo_scope) return true; // global
+        try {
+          const scopes: string[] = JSON.parse(row.repo_scope);
+          return scopes.some((s) => s.toLowerCase() === repoFullName);
+        } catch {
+          return row.repo_scope.toLowerCase() === repoFullName;
+        }
+      })
+      .map(rowToConfig);
   }
 }

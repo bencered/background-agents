@@ -45,8 +45,8 @@ function configToForm(config: McpServerConfig): FormState {
     env: config.env && Object.keys(config.env).length > 0
       ? Object.entries(config.env).map(([k, v]) => `${k}=${v}`).join("\n")
       : "",
-    repoScopes: config.repoScope ? [config.repoScope] : [],
-    scopeMode: config.repoScope ? "selected" : "global",
+    repoScopes: config.repoScopes ?? [],
+    scopeMode: config.repoScopes?.length ? "selected" : "global",
     enabled: config.enabled,
   };
 }
@@ -115,8 +115,8 @@ export function McpServersSettings() {
         name: form.name.trim(),
         type: form.type,
         enabled: form.enabled,
-        repoScope: form.scopeMode === "selected" && form.repoScopes.length > 0
-          ? form.repoScopes[0]
+        repoScopes: form.scopeMode === "selected" && form.repoScopes.length > 0
+          ? form.repoScopes
           : null,
         env: parseEnv(form.env),
       };
@@ -315,10 +315,15 @@ export function McpServersSettings() {
                           className="flex items-center gap-2 px-3 py-2 hover:bg-muted/50 transition cursor-pointer text-sm"
                         >
                           <input
-                            type="radio"
-                            name="repo-scope"
+                            type="checkbox"
                             checked={isChecked}
-                            onChange={() => setForm({ ...form, repoScopes: [fullName] })}
+                            onChange={() => {
+                              const next = isChecked
+                                ? form.repoScopes.filter((r) => r !== fullName)
+                                : [...form.repoScopes, fullName];
+                              setForm({ ...form, repoScopes: next });
+                            }}
+                            className="rounded border-border"
                           />
                           <span className="text-foreground">{repo.fullName}</span>
                           {repo.private && (
@@ -394,8 +399,12 @@ export function McpServersSettings() {
                     {server.type === "remote"
                       ? server.url
                       : server.command?.join(" ")}
-                    {server.repoScope ? (
-                      <span className="ml-2 text-accent">• {server.repoScope}</span>
+                    {server.repoScopes?.length ? (
+                      <span className="ml-2 text-accent">
+                        • {server.repoScopes.length === 1
+                          ? server.repoScopes[0]
+                          : `${server.repoScopes.length} repos`}
+                      </span>
                     ) : (
                       <span className="ml-2 text-muted-foreground/60">• global</span>
                     )}

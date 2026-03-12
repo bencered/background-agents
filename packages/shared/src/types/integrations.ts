@@ -48,7 +48,7 @@ export interface McpServerConfig {
   command?: string[];
   url?: string;
   env?: Record<string, string>;
-  repoScope?: string | null;
+  repoScopes?: string[] | null;
   enabled: boolean;
 }
 

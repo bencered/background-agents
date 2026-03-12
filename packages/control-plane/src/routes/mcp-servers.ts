@@ -72,7 +72,7 @@ async function handleCreateMcpServer(
       command: body.command,
       url: body.url,
       env: body.env,
-      repoScope: body.repoScope ?? null,
+      repoScopes: body.repoScopes ?? null,
       enabled: body.enabled !== false,
     });
     logger.info("mcp_server_created", { id: server.id, name: server.name });
