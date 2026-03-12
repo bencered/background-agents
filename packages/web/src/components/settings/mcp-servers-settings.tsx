@@ -262,6 +262,7 @@ export function McpServersSettings() {
   const [saving, setSaving] = useState(false);
 
   function startNew() {
+    setExpanded(null);
     setForm(emptyForm);
     setEditing("new");
     setError(null);
@@ -357,14 +358,12 @@ export function McpServersSettings() {
     <div>
       <div className="flex items-center justify-between mb-1">
         <h2 className="text-xl font-semibold text-foreground">MCP Servers</h2>
-        {!editing && (
-          <Button onClick={startNew} variant="outline" size="sm">
-            <span className="inline-flex items-center gap-1">
-              <PlusIcon className="w-3.5 h-3.5" />
-              Add Server
-            </span>
-          </Button>
-        )}
+        <Button onClick={startNew} variant="outline" size="sm">
+          <span className="inline-flex items-center gap-1">
+            <PlusIcon className="w-3.5 h-3.5" />
+            Add Server
+          </span>
+        </Button>
       </div>
       <p className="text-sm text-muted-foreground mb-6">
         Configure Model Context Protocol servers that are available to agent sessions.
@@ -491,7 +490,7 @@ export function McpServersSettings() {
 
                 {/* Expanded edit form */}
                 {isExpanded && editing === server.id && (
-                  <div className="px-4 pb-4 pt-1 border-t border-border space-y-4">
+                  <div className="px-4 pb-4 pt-3 border-t border-border space-y-4">
                     <McpServerForm
                       form={form}
                       setForm={setForm}
