@@ -248,6 +248,14 @@ export function useSessionSocket(sessionId: string): UseSessionSocketReturn {
           }
           break;
 
+        case "usage_update":
+          setSessionState((prev) =>
+            prev
+              ? { ...prev, totalTokens: data.totalTokens, totalCost: data.totalCost }
+              : null
+          );
+          break;
+
         case "history_page": {
           // Prepend older events to the beginning
           setEvents((prev) => [...data.items.map(toUiSandboxEvent), ...prev]);

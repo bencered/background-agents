@@ -1365,6 +1365,14 @@ export class SessionDO extends DurableObject<Env> {
   private persistUsageToD1(tokens: number, cost: number): void {
     this._totalTokens += tokens;
     this._totalCost += cost;
+
+    // Broadcast updated usage to all connected clients
+    this.wsManager.broadcast({
+      type: "usage_update",
+      totalTokens: this._totalTokens,
+      totalCost: this._totalCost,
+    });
+
     if (!this.env.DB) return;
     const session = this.getSession();
     if (!session) return;
