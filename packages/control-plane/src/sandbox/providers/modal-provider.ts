@@ -106,6 +106,7 @@ export class ModalSandboxProvider implements SandboxProvider {
           userEnvVars: config.userEnvVars,
           timeoutSeconds: config.timeoutSeconds ?? DEFAULT_SANDBOX_TIMEOUT_SECONDS,
           branch: config.branch,
+          mcpServers: config.mcpServers,
         },
         config.correlation
       );

@@ -363,11 +363,17 @@ export class SandboxLifecycleManager {
         session.spawn_source === "agent" ? CHILD_SANDBOX_TIMEOUT_SECONDS : undefined;
 
       // Load MCP servers for this repo
-      let mcpServers;
+      let mcpServers: import("@open-inspect/shared").McpServerConfig[] | undefined;
       try {
         if (!this.config.db) throw new Error("DB not configured");
         const mcpStore = new McpServerStore(this.config.db);
         mcpServers = await mcpStore.getForSession(session.repo_owner, session.repo_name);
+        this.log.info("MCP servers loaded", {
+          event: "mcp.loaded",
+          count: mcpServers?.length ?? 0,
+          names: mcpServers?.map((s) => s.name) ?? [],
+          hasDb: !!this.config.db,
+        });
       } catch (err) {
         this.log.warn("Failed to load MCP servers", { event: "mcp.load_failed", error: String(err) });
       }
@@ -492,6 +498,20 @@ export class SandboxLifecycleManager {
       const timeoutSeconds =
         session.spawn_source === "agent" ? CHILD_SANDBOX_TIMEOUT_SECONDS : undefined;
 
+      // Load MCP servers (same logic as doSpawn)
+      let mcpServers: import("@open-inspect/shared").McpServerConfig[] | undefined;
+      try {
+        if (!this.config.db) throw new Error("DB not configured");
+        const mcpStore = new McpServerStore(this.config.db);
+        mcpServers = await mcpStore.getForSession(session.repo_owner, session.repo_name);
+        this.log.info("MCP servers loaded for restore", {
+          event: "mcp.loaded",
+          count: mcpServers?.length ?? 0,
+        });
+      } catch (err) {
+        this.log.warn("Failed to load MCP servers for restore", { event: "mcp.load_failed", error: String(err) });
+      }
+
       const result = await this.provider.restoreFromSnapshot({
         snapshotImageId,
         sessionId: session.session_name || session.id,
@@ -505,6 +525,7 @@ export class SandboxLifecycleManager {
         userEnvVars,
         timeoutSeconds,
         branch: session.base_branch,
+        mcpServers: mcpServers?.length ? mcpServers : undefined,
       });
 
       if (result.success) {

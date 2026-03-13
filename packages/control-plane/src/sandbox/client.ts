@@ -61,6 +61,7 @@ export interface RestoreSandboxRequest {
   userEnvVars?: Record<string, string>;
   timeoutSeconds?: number;
   branch?: string;
+  mcpServers?: import("@open-inspect/shared").McpServerConfig[];
 }
 
 export interface RestoreSandboxResponse {
@@ -315,6 +316,7 @@ export class ModalClient {
             provider: request.provider,
             model: request.model,
             branch: request.branch || null,
+            mcp_servers: request.mcpServers || null,
           },
           sandbox_id: request.sandboxId,
           control_plane_url: request.controlPlaneUrl,

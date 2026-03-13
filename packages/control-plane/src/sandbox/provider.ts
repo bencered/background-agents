@@ -103,6 +103,8 @@ export interface RestoreConfig {
   timeoutSeconds?: number;
   /** Git branch to work on (defaults to repo's default branch) */
   branch?: string;
+  /** MCP servers to inject into the sandbox */
+  mcpServers?: import("@open-inspect/shared").McpServerConfig[];
   /** Correlation context for downstream tracing */
   correlation?: CorrelationContext;
 }

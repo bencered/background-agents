@@ -23,8 +23,8 @@ SANDBOX_DIR = Path(__file__).parent.parent / "sandbox"
 OPENCODE_VERSION = "latest"
 
 # Cache buster - change this to force Modal image rebuild
-# v40: Pull latest OpenCode with GPT-5.4 codex allowlist support
-CACHE_BUSTER = "v40-gpt-5-4"
+# v43: Force image rebuild - entrypoint debug logging + init fix
+CACHE_BUSTER = "v43-entrypoint-init-fix"
 
 # Base image with all development tools
 base_image = (
@@ -114,7 +114,7 @@ base_image = (
         "mkdir -p /workspace",
         "mkdir -p /app/plugins",
         "mkdir -p /tmp/opencode",
-        "echo 'Image rebuilt at: v21-force-rebuild' > /app/image-version.txt",
+        "echo 'Image rebuilt at: v43-mcp-fix-2026-03-13T04' > /app/image-version.txt",
     )
     # Set environment variables (including cache buster to force rebuild)
     .env(
@@ -135,6 +135,7 @@ base_image = (
         str(SANDBOX_DIR),
         remote_path="/app/sandbox",
     )
+    .run_commands(f"echo 'sandbox_version={CACHE_BUSTER}' > /app/sandbox/.version")
 )
 
 # Image variant optimized for Node.js/TypeScript projects

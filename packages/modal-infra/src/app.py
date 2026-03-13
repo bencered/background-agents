@@ -35,6 +35,8 @@ function_image = (
 # These are injected into sandboxes but never stored in snapshots
 llm_secrets = modal.Secret.from_name(
     "llm-api-keys",
+    # ANTHROPIC_API_KEY is always present; OPENCODE_ZEN_API_KEY and
+    # OPENCODE_GO_API_KEY are optional (added via terraform when configured).
     required_keys=["ANTHROPIC_API_KEY"],
 )
 
