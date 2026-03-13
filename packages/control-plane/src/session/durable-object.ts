@@ -950,6 +950,7 @@ export class SessionDO extends DurableObject<Env> {
   private async handleSandboxMessage(ws: WebSocket, message: string): Promise<void> {
     try {
       const event = JSON.parse(message) as SandboxEvent;
+      console.log("[SANDBOX_MSG]", event.type, event.type === "step_finish" ? JSON.stringify((event as any).tokens) : "");
       await this.processSandboxEvent(event);
     } catch (e) {
       this.log.error("Error processing sandbox message", {

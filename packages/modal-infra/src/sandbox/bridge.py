@@ -623,25 +623,40 @@ class AgentBridge:
         try:
             had_error = False
             error_message = None
+            accumulated_tokens: dict[str, Any] | None = None
+            accumulated_cost = 0.0
             async for event in self._stream_opencode_response_sse(
                 message_id, content, model, reasoning_effort
             ):
                 if event.get("type") == "error":
                     had_error = True
                     error_message = event.get("error")
+                if event.get("type") == "step_finish":
+                    t = event.get("tokens")
+                    c = event.get("cost") or 0
+                    accumulated_cost += c
+                    if t and isinstance(t, dict):
+                        if accumulated_tokens is None:
+                            accumulated_tokens = {"input": 0, "output": 0, "reasoning": 0}
+                        accumulated_tokens["input"] += t.get("input", 0)
+                        accumulated_tokens["output"] += t.get("output", 0)
+                        accumulated_tokens["reasoning"] += t.get("reasoning", 0)
                 await self._send_event(event)
 
             if had_error:
                 outcome = "error"
 
-            await self._send_event(
-                {
-                    "type": "execution_complete",
-                    "messageId": message_id,
-                    "success": not had_error,
-                    **({"error": error_message} if error_message else {}),
-                }
-            )
+            completion_event: dict[str, Any] = {
+                "type": "execution_complete",
+                "messageId": message_id,
+                "success": not had_error,
+            }
+            if error_message:
+                completion_event["error"] = error_message
+            if accumulated_tokens or accumulated_cost > 0:
+                completion_event["tokens"] = accumulated_tokens
+                completion_event["cost"] = accumulated_cost
+            await self._send_event(completion_event)
 
         except Exception as e:
             outcome = "error"

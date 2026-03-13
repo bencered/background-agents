@@ -245,6 +245,28 @@ export function useSessionSocket(sessionId: string): UseSessionSocketReturn {
         case "sandbox_event":
           if (data.event) {
             processSandboxEvent(toUiSandboxEvent(data.event));
+            // Client-side token accumulation from step_finish events
+            if (data.event.type === "step_finish") {
+              const t = data.event.tokens;
+              const c = data.event.cost ?? 0;
+              let tokens = 0;
+              if (typeof t === "number") {
+                tokens = t;
+              } else if (t && typeof t === "object") {
+                tokens = (t.input ?? 0) + (t.output ?? 0) + (t.reasoning ?? 0);
+              }
+              if (tokens > 0 || c > 0) {
+                setSessionState((prev) =>
+                  prev
+                    ? {
+                        ...prev,
+                        totalTokens: (prev.totalTokens ?? 0) + tokens,
+                        totalCost: (prev.totalCost ?? 0) + c,
+                      }
+                    : null
+                );
+              }
+            }
           }
           break;
 

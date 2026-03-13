@@ -71,8 +71,16 @@ export class SessionSandboxEventProcessor {
       this.deps.updateLastActivity(now);
       if (event.type === "step_finish") {
         const t = event.tokens;
-        const tokens = t ? (t.input ?? 0) + (t.output ?? 0) + (t.reasoning ?? 0) : 0;
+        // Debug: log raw token data to understand provider format
+        console.log("[USAGE_DEBUG] step_finish tokens:", JSON.stringify(t), "cost:", event.cost, "type:", typeof t);
+        let tokens = 0;
+        if (typeof t === "number") {
+          tokens = t;
+        } else if (t && typeof t === "object") {
+          tokens = (t.input ?? 0) + (t.output ?? 0) + (t.reasoning ?? 0);
+        }
         const cost = event.cost ?? 0;
+        console.log("[USAGE_DEBUG] computed tokens:", tokens, "cost:", cost);
         if (tokens > 0 || cost > 0) {
           this.deps.persistUsage(tokens, cost);
         }
@@ -120,6 +128,21 @@ export class SessionSandboxEventProcessor {
     }
 
     if (event.type === "execution_complete") {
+      // Extract usage from execution_complete (bridge accumulates from step_finish events)
+      const execAny = event as Record<string, unknown>;
+      const execTokens = execAny.tokens as { input?: number; output?: number; reasoning?: number } | undefined;
+      const execCost = (execAny.cost as number) ?? 0;
+      let totalTokenCount = 0;
+      if (typeof execTokens === "number") {
+        totalTokenCount = execTokens;
+      } else if (execTokens && typeof execTokens === "object") {
+        totalTokenCount = (execTokens.input ?? 0) + (execTokens.output ?? 0) + (execTokens.reasoning ?? 0);
+      }
+      if (totalTokenCount > 0 || execCost > 0) {
+        console.log("[USAGE] execution_complete usage:", totalTokenCount, "tokens,", execCost, "cost");
+        this.deps.persistUsage(totalTokenCount, execCost);
+      }
+
       if (messageId) {
         this.deps.repository.upsertExecutionCompleteEvent(messageId, event, now);
       }
