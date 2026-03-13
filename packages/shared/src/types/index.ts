@@ -288,6 +288,7 @@ export type ServerMessage =
   | { type: "sandbox_restored"; message: string }
   | { type: "sandbox_warning"; message: string }
   | { type: "processing_status"; isProcessing: boolean }
+  | { type: "usage_update"; totalTokens: number; totalCost: number }
   | {
       type: "history_page";
       items: SandboxEvent[];
