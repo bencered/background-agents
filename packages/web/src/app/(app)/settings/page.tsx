@@ -55,7 +55,7 @@ export default function SettingsPage() {
   // Sync state when searchParams change via client-side navigation
   useEffect(() => {
     if (isValidCategory(tabParam)) {
-      setActiveCategory(tabParam);
+      setActiveCategoryRaw(tabParam);
       setMobileView("detail");
     }
   }, [tabParam]);
