@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Diff View — Open-Inspect</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: #1a1a1a;
+      color: #f8f8f6;
+      min-height: 100vh;
+    }
+    .header {
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .header h1 { font-size: 14px; font-weight: 500; color: #f8f8f6; }
+    .badge {
+      font-size: 10px; padding: 1px 6px;
+      background: rgba(255,255,255,0.05); color: #999;
+      border: 1px solid rgba(255,255,255,0.1);
+      text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .controls { display: flex; gap: 6px; }
+    .toggle-group { display: flex; border: 1px solid rgba(255,255,255,0.1); }
+    .toggle-btn {
+      padding: 3px 10px; font-size: 11px; border: none; cursor: pointer;
+      background: transparent; color: #666; font-weight: 500;
+    }
+    .toggle-btn + .toggle-btn { border-left: 1px solid rgba(255,255,255,0.1); }
+    .toggle-btn.active { background: rgba(255,255,255,0.05); color: #f8f8f6; }
+    .stats-bar {
+      padding: 8px 20px; border-bottom: 1px solid rgba(255,255,255,0.1);
+      display: flex; align-items: center; gap: 12px;
+      font-size: 12px; color: #666; font-family: 'SF Mono', monospace;
+    }
+    .stats-bar .add { color: #28c840; }
+    .stats-bar .del { color: #f85149; }
+    .stats-bar .cc { margin-left: auto; color: #a68b6a; }
+    .page-layout { display: flex; min-height: calc(100vh - 80px); }
+    .file-tree {
+      width: 240px; border-right: 1px solid rgba(255,255,255,0.1);
+      padding: 12px; flex-shrink: 0;
+    }
+    .file-tree-label {
+      font-size: 10px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.5px; color: #666; margin-bottom: 8px;
+    }
+    .file-entry {
+      padding: 4px 6px; font-size: 12px; cursor: pointer;
+      display: flex; justify-content: space-between; align-items: center;
+      border-left: 2px solid transparent;
+    }
+    .file-entry.active { background: rgba(255,255,255,0.05); border-left-color: #a68b6a; }
+    .file-name { color: #f8f8f6; font-family: 'SF Mono', monospace; font-size: 11px; }
+    .file-stats { display: flex; gap: 4px; font-family: 'SF Mono', monospace; font-size: 10px; }
+    .file-stats .add { color: #28c840; }
+    .main-content { flex: 1; min-width: 0; }
+    .diff-container { padding: 12px 16px 48px; }
+    #diff-root { min-height: 200px; }
+    .loading {
+      display: flex; align-items: center; justify-content: center;
+      height: 200px; color: #666; font-size: 12px; font-family: 'SF Mono', monospace;
+    }
+    .loading::after {
+      content: ''; width: 12px; height: 12px;
+      border: 1.5px solid #333; border-top-color: #a68b6a;
+      border-radius: 50%; animation: spin 0.8s linear infinite; margin-left: 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="header-left">
+      <h1>Diff View</h1>
+      <span class="badge">@pierre/diffs</span>
+    </div>
+    <div class="controls">
+      <div class="toggle-group" id="mode-toggle">
+        <button class="toggle-btn active" data-mode="patch">Patch</button>
+        <button class="toggle-btn" data-mode="files">Files</button>
+      </div>
+      <div class="toggle-group" id="style-toggle">
+        <button class="toggle-btn active" data-style="split">Split</button>
+        <button class="toggle-btn" data-style="unified">Unified</button>
+      </div>
+    </div>
+  </div>
+  <div class="stats-bar">
+    <span>1 file</span>
+    <span class="add">+21</span>
+    <span class="cc" id="comment-count">2 comments</span>
+  </div>
+  <div class="page-layout">
+    <div class="file-tree" id="file-tree">
+      <div class="file-tree-label">Files</div>
+    </div>
+    <div class="main-content">
+      <div class="diff-container">
+        <div id="diff-root"><div class="loading">loading</div></div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { FileDiff, parsePatchFiles, parseDiffFromFile } from 'https://esm.sh/@pierre/diffs@1?bundle';
+
+    const SAMPLE_PATCH = `diff --git a/src/session/sandbox-events.ts b/src/session/sandbox-events.ts
+index 3a1b2c4..8f9d0e1 100644
+--- a/src/session/sandbox-events.ts
++++ b/src/session/sandbox-events.ts
+@@ -1,6 +1,7 @@
+ import { generateId } from "../auth/crypto";
+ import type { Logger } from "../logger";
+ import type { SandboxEvent, ServerMessage } from "../types";
++import type { DiffSnapshotService } from "./diff-snapshot-service";
+ import { shouldPersistToolCallEvent } from "./event-persistence";
+ import type { SessionRepository } from "./repository";
+ 
+@@ -8,6 +9,8 @@
+ export class SessionSandboxEventProcessor {
++  private diffDebounceTimer: ReturnType<typeof setTimeout> | null = null;
++
+   constructor(private readonly deps: SessionSandboxEventProcessorDeps) {}
+ 
+   async processSandboxEvent(event: SandboxEvent): Promise<void> {
+@@ -20,6 +23,12 @@
+       return;
+     }
+ 
++    if (event.type === "tool_call" && event.status === "completed") {
++      this.deps.broadcast({ type: "sandbox_event", event });
++      this.scheduleDiffSnapshot();
++      return;
++    }
++
+     if (event.type === "execution_complete") {
+       this.deps.broadcast({ type: "sandbox_event", event });
+       await this.deps.reconcileSessionStatusAfterExecution(event.success);
++      // Always capture final diff snapshot
++      await this.deps.diffService.captureSnapshot();
+       return;
+     }
+@@ -32,4 +41,15 @@
+ 
+     this.deps.broadcast({ type: "sandbox_event", event });
+   }
++
++  private scheduleDiffSnapshot(): void {
++    if (this.diffDebounceTimer) {
++      clearTimeout(this.diffDebounceTimer);
++    }
++    this.diffDebounceTimer = setTimeout(async () => {
++      await this.deps.diffService.captureSnapshot();
++      this.diffDebounceTimer = null;
++    }, 500);
++  }
+ }`;
+
+    const SAMPLE_OLD = {
+      name: 'src/session/sandbox-events.ts',
+      contents: "import { generateId } from \"../auth/crypto\";\nimport type { Logger } from \"../logger\";\nimport type { SandboxEvent, ServerMessage } from \"../types\";\nimport { shouldPersistToolCallEvent } from \"./event-persistence\";\nimport type { SessionRepository } from \"./repository\";\n\nexport class SessionSandboxEventProcessor {\n  constructor(private readonly deps: SessionSandboxEventProcessorDeps) {}\n\n  async processSandboxEvent(event: SandboxEvent): Promise<void> {\n    if (event.type === \"heartbeat\") {\n      this.deps.repository.updateSandboxHeartbeat(Date.now());\n      return;\n    }\n\n    if (event.type === \"token\") {\n      this.deps.broadcast({ type: \"sandbox_event\", event });\n      return;\n    }\n\n    if (event.type === \"execution_complete\") {\n      this.deps.broadcast({ type: \"sandbox_event\", event });\n      await this.deps.reconcileSessionStatusAfterExecution(event.success);\n      return;\n    }\n\n    this.deps.repository.createEvent({\n      id: generateId(),\n      type: event.type,\n      data: JSON.stringify(event),\n      messageId: null,\n      createdAt: Date.now(),\n    });\n\n    this.deps.broadcast({ type: \"sandbox_event\", event });\n  }\n}\n",
+    };
+
+    const SAMPLE_NEW = {
+      name: 'src/session/sandbox-events.ts',
+      contents: "import { generateId } from \"../auth/crypto\";\nimport type { Logger } from \"../logger\";\nimport type { SandboxEvent, ServerMessage } from \"../types\";\nimport { shouldPersistToolCallEvent } from \"./event-persistence\";\nimport type { SessionRepository } from \"./repository\";\nimport type { DiffSnapshotService } from \"./diff-snapshot-service\";\n\nexport class SessionSandboxEventProcessor {\n  private diffDebounceTimer: ReturnType<typeof setTimeout> | null = null;\n\n  constructor(private readonly deps: SessionSandboxEventProcessorDeps) {}\n\n  async processSandboxEvent(event: SandboxEvent): Promise<void> {\n    if (event.type === \"heartbeat\") {\n      this.deps.repository.updateSandboxHeartbeat(Date.now());\n      return;\n    }\n\n    if (event.type === \"token\") {\n      this.deps.broadcast({ type: \"sandbox_event\", event });\n      return;\n    }\n\n    if (event.type === \"tool_call\" && event.status === \"completed\") {\n      this.deps.broadcast({ type: \"sandbox_event\", event });\n      this.scheduleDiffSnapshot();\n      return;\n    }\n\n    if (event.type === \"execution_complete\") {\n      this.deps.broadcast({ type: \"sandbox_event\", event });\n      await this.deps.reconcileSessionStatusAfterExecution(event.success);\n      await this.deps.diffService.captureSnapshot();\n      return;\n    }\n\n    this.deps.repository.createEvent({\n      id: generateId(),\n      type: event.type,\n      data: JSON.stringify(event),\n      messageId: null,\n      createdAt: Date.now(),\n    });\n\n    this.deps.broadcast({ type: \"sandbox_event\", event });\n  }\n\n  private scheduleDiffSnapshot(): void {\n    if (this.diffDebounceTimer) {\n      clearTimeout(this.diffDebounceTimer);\n    }\n    this.diffDebounceTimer = setTimeout(async () => {\n      await this.deps.diffService.captureSnapshot();\n      this.diffDebounceTimer = null;\n    }, 500);\n  }\n}\n",
+    };
+
+    // --- State ---
+    let currentMode = 'patch';
+    let currentStyle = 'split';
+    let diffInstance = null;
+    let pendingComment = null; // { startLine, endLine, side }
+
+    const AVATAR_COLORS = { Bence: '#da3633', Cole: '#1f6feb', You: '#a68b6a' };
+
+    const comments = [
+      {
+        id: '1', startLine: 10, endLine: 10, side: 'additions',
+        author: 'Bence', text: 'Should we make the debounce interval configurable?',
+        createdAt: Date.now() - 60000,
+      },
+      {
+        id: '2', startLine: 35, endLine: 36, side: 'additions',
+        author: 'Cole',
+        text: 'Nice — capturing on execution_complete is important for the final state.',
+        createdAt: Date.now() - 30000,
+      },
+    ];
+
+    // --- Shadow DOM CSS ---
+    function getCustomCSS() {
+      const commentedLines = new Set();
+      for (const c of comments) {
+        for (let i = c.startLine; i <= c.endLine; i++) commentedLines.add(i);
+      }
+
+      // Override green addition bg → blue for commented lines
+      let highlights = '';
+      for (const ln of commentedLines) {
+        // Target both the line row and its children
+        highlights += `
+          [data-line-type="change-addition"][data-line="${ln}"] [data-column-content],
+          [data-line-type="change-addition"][data-line="${ln}"] [data-column-number] {
+            background: rgba(56, 139, 253, 0.25) !important;
+          }
+          [data-line-type="context"][data-line="${ln}"] [data-column-content],
+          [data-line-type="context"][data-line="${ln}"] [data-column-number],
+          [data-line-type="context"][data-alt-line="${ln}"] [data-column-content],
+          [data-line-type="context"][data-alt-line="${ln}"] [data-column-number] {
+            background: rgba(56, 139, 253, 0.18) !important;
+          }
+        `;
+      }
+
+      return `
+        /* Plus button on gutter hover */
+        [data-column-number] {
+          position: relative !important;
+        }
+        [data-line]:hover [data-column-number]::before {
+          content: '+' !important;
+          position: absolute !important;
+          left: 0 !important;
+          top: 0 !important;
+          width: 100% !important;
+          height: 100% !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          background: #388bfd !important;
+          color: #fff !important;
+          font-size: 13px !important;
+          font-weight: bold !important;
+          cursor: pointer !important;
+          z-index: 5 !important;
+        }
+
+        /* Commented line highlights — blue override */
+        ${highlights}
+
+        /* Selection highlight */
+        [data-selected-line="true"] [data-column-content],
+        [data-selected-line="true"] [data-column-number] {
+          background: rgba(56, 139, 253, 0.25) !important;
+        }
+
+        /* Annotations */
+        [data-diffs-annotation] {
+          margin: 0 !important;
+          padding: 0 !important;
+        }
+      `;
+    }
+
+    // --- File tree ---
+    function renderFileTree() {
+      const tree = document.getElementById('file-tree');
+      tree.innerHTML = '<div class="file-tree-label">Files</div>';
+      const el = document.createElement('div');
+      el.className = 'file-entry active';
+      el.innerHTML = '<span class="file-name">sandbox-events.ts</span><span class="file-stats"><span class="add">+21</span></span>';
+      tree.appendChild(el);
+    }
+
+    // --- Build comment element ---
+    function buildCommentEl(c) {
+      const wrap = document.createElement('div');
+      wrap.style.cssText = `
+        background: #222;
+        border: 1px solid rgba(255,255,255,0.12);
+        margin: 2px 0;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      `;
+
+      // Header
+      const hdr = document.createElement('div');
+      hdr.style.cssText = `
+        padding: 8px 12px;
+        display: flex; align-items: center; gap: 8px;
+        border-bottom: 1px solid rgba(255,255,255,0.06);
+        background: rgba(255,255,255,0.02);
+      `;
+
+      // Avatar
+      const av = document.createElement('div');
+      const color = AVATAR_COLORS[c.author] || '#666';
+      av.style.cssText = `
+        width: 20px; height: 20px;
+        background: ${color};
+        display: flex; align-items: center; justify-content: center;
+        font-size: 10px; font-weight: 700; color: #fff;
+        flex-shrink: 0;
+      `;
+      av.textContent = c.author[0].toUpperCase();
+
+      const name = document.createElement('span');
+      name.style.cssText = 'font-weight: 600; font-size: 12px; color: #f8f8f6;';
+      name.textContent = c.author;
+
+      const time = document.createElement('span');
+      time.style.cssText = 'font-size: 11px; color: #666;';
+      time.textContent = fmtTime(c.createdAt);
+
+      // Line range badge
+      const badge = document.createElement('span');
+      badge.style.cssText = `
+        margin-left: auto;
+        font-size: 10px; color: #388bfd;
+        font-family: 'SF Mono', monospace;
+        background: rgba(56,139,253,0.1);
+        padding: 1px 5px;
+        border: 1px solid rgba(56,139,253,0.2);
+      `;
+      badge.textContent = c.startLine === c.endLine ? `L${c.startLine}` : `L${c.startLine}–L${c.endLine}`;
+
+      hdr.append(av, name, time, badge);
+
+      // Body
+      const body = document.createElement('div');
+      body.style.cssText = 'padding: 8px 12px 10px; font-size: 13px; color: #ccc; line-height: 1.5;';
+      body.textContent = c.text;
+
+      wrap.append(hdr, body);
+      return wrap;
+    }
+
+    // --- Build inline comment input ---
+    function buildInputEl(startLine, endLine, side) {
+      const wrap = document.createElement('div');
+      wrap.style.cssText = `
+        background: #222;
+        border: 1px solid rgba(56,139,253,0.3);
+        margin: 2px 0;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      `;
+
+      // Header
+      const hdr = document.createElement('div');
+      hdr.style.cssText = `
+        padding: 6px 12px;
+        display: flex; align-items: center; gap: 6px;
+        border-bottom: 1px solid rgba(255,255,255,0.06);
+        background: rgba(56,139,253,0.05);
+        font-size: 11px; color: #8b949e;
+        font-family: 'SF Mono', monospace;
+      `;
+      hdr.textContent = startLine === endLine ? `Line ${startLine}` : `Lines ${startLine}–${endLine}`;
+
+      // Textarea
+      const ta = document.createElement('textarea');
+      ta.placeholder = 'Leave a comment';
+      ta.style.cssText = `
+        display: block;
+        width: calc(100% - 24px);
+        margin: 10px 12px 0;
+        min-height: 64px;
+        background: #1a1a1a;
+        border: 1px solid rgba(255,255,255,0.1);
+        color: #f8f8f6;
+        padding: 8px 10px;
+        font-size: 13px;
+        font-family: inherit;
+        resize: vertical;
+        outline: none;
+      `;
+      ta.addEventListener('focus', () => { ta.style.borderColor = '#388bfd'; });
+      ta.addEventListener('blur', () => { ta.style.borderColor = 'rgba(255,255,255,0.1)'; });
+
+      // Actions
+      const acts = document.createElement('div');
+      acts.style.cssText = 'display: flex; justify-content: flex-end; gap: 6px; padding: 8px 12px;';
+
+      const cancelBtn = document.createElement('button');
+      cancelBtn.textContent = 'Cancel';
+      cancelBtn.style.cssText = `
+        padding: 4px 12px; font-size: 11px; font-weight: 500;
+        border: 1px solid rgba(255,255,255,0.1);
+        background: transparent; color: #999; cursor: pointer;
+      `;
+      cancelBtn.addEventListener('click', () => { pendingComment = null; renderDiff(); });
+
+      const submitBtn = document.createElement('button');
+      submitBtn.textContent = 'Comment';
+      submitBtn.style.cssText = `
+        padding: 4px 12px; font-size: 11px; font-weight: 500;
+        border: none;
+        background: #388bfd; color: #fff; cursor: pointer;
+      `;
+      submitBtn.addEventListener('click', () => {
+        const text = ta.value.trim();
+        if (!text) return;
+        comments.push({
+          id: String(Date.now()), startLine, endLine, side,
+          author: 'You', text, createdAt: Date.now(),
+        });
+        pendingComment = null;
+        renderDiff();
+      });
+
+      ta.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); submitBtn.click(); }
+        if (e.key === 'Escape') cancelBtn.click();
+      });
+
+      acts.append(cancelBtn, submitBtn);
+      wrap.append(hdr, ta, acts);
+      requestAnimationFrame(() => ta.focus());
+      return wrap;
+    }
+
+    function fmtTime(ts) {
+      const d = Date.now() - ts;
+      if (d < 60000) return 'now';
+      if (d < 3600000) return Math.floor(d / 60000) + 'm';
+      if (d < 86400000) return Math.floor(d / 3600000) + 'h';
+      return new Date(ts).toLocaleDateString();
+    }
+
+    // --- Annotation renderer ---
+    function renderAnnotationEl(annotation) {
+      const m = annotation.metadata;
+      if (m._isPending) return buildInputEl(m._startLine, m._endLine, m._side);
+      return buildCommentEl(m);
+    }
+
+    // --- Click on gutter to add comment ---
+    function setupGutterClickHandler() {
+      const dc = document.querySelector('diffs-container');
+      if (!dc || !dc.shadowRoot) return;
+      const sr = dc.shadowRoot;
+
+      sr.addEventListener('click', (e) => {
+        const numEl = e.target.closest('[data-column-number]');
+        if (!numEl) return;
+        const lineRow = numEl.closest('[data-line]');
+        if (!lineRow) return;
+        const lineNum = parseInt(lineRow.getAttribute('data-line'));
+        const lineType = lineRow.getAttribute('data-line-type');
+        const side = lineType === 'change-deletion' ? 'deletions' : 'additions';
+        if (!isNaN(lineNum)) {
+          pendingComment = { startLine: lineNum, endLine: lineNum, side };
+          renderDiff();
+        }
+      });
+    }
+
+    // --- Build all annotations ---
+    function buildAnnotations() {
+      const anns = [];
+
+      // Real comments: annotation on the LAST line of the range
+      for (const c of comments) {
+        anns.push({ lineNumber: c.endLine, side: c.side, metadata: c });
+      }
+
+      // Pending input: annotation on the LAST line of selected range
+      if (pendingComment) {
+        anns.push({
+          lineNumber: pendingComment.endLine,
+          side: pendingComment.side,
+          metadata: {
+            _isPending: true,
+            _startLine: pendingComment.startLine,
+            _endLine: pendingComment.endLine,
+            _side: pendingComment.side,
+          },
+        });
+      }
+
+      return anns;
+    }
+
+    // --- Render ---
+    function renderDiff() {
+      const root = document.getElementById('diff-root');
+      root.innerHTML = '';
+
+      diffInstance = new FileDiff({
+        theme: 'pierre-dark',
+        diffStyle: currentStyle,
+        renderAnnotation: renderAnnotationEl,
+        unsafeCSS: getCustomCSS(),
+        enableLineSelection: true,
+        onLineSelectionEnd: (range) => {
+          if (range) {
+            const start = Math.min(range.start, range.end);
+            const end = Math.max(range.start, range.end);
+            const side = range.side || range.endSide || 'additions';
+            pendingComment = { startLine: start, endLine: end, side };
+            renderDiff();
+          }
+        },
+      });
+
+      if (currentMode === 'patch') {
+        const patches = parsePatchFiles(SAMPLE_PATCH);
+        if (patches.length > 0 && patches[0].files.length > 0) {
+          diffInstance.render({
+            fileDiff: patches[0].files[0],
+            containerWrapper: root,
+            lineAnnotations: buildAnnotations(),
+          });
+        }
+      } else {
+        diffInstance.render({
+          oldFile: SAMPLE_OLD,
+          newFile: SAMPLE_NEW,
+          containerWrapper: root,
+          lineAnnotations: buildAnnotations(),
+        });
+      }
+
+      // Setup gutter click handler after render (needs Shadow DOM to exist)
+      requestAnimationFrame(() => setupGutterClickHandler());
+
+      renderFileTree();
+      document.getElementById('comment-count').textContent =
+        comments.length + ' comment' + (comments.length !== 1 ? 's' : '');
+    }
+
+    // --- Toggles ---
+    document.getElementById('mode-toggle').addEventListener('click', (e) => {
+      const btn = e.target.closest('.toggle-btn');
+      if (!btn) return;
+      currentMode = btn.dataset.mode;
+      document.querySelectorAll('#mode-toggle .toggle-btn').forEach(b => b.classList.toggle('active', b === btn));
+      pendingComment = null;
+      renderDiff();
+    });
+    document.getElementById('style-toggle').addEventListener('click', (e) => {
+      const btn = e.target.closest('.toggle-btn');
+      if (!btn) return;
+      currentStyle = btn.dataset.style;
+      document.querySelectorAll('#style-toggle .toggle-btn').forEach(b => b.classList.toggle('active', b === btn));
+      pendingComment = null;
+      renderDiff();
+    });
+
+    renderDiff();
+  </script>
+</body>
+</html>
