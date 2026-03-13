@@ -228,11 +228,14 @@ export function SessionSidebar({ onNewSession, onToggle, onSessionSelect }: Sess
 function UserMenu({ user }: { user?: { name?: string | null; image?: string | null } | null }) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const [menuPos, setMenuPos] = useState<{ bottom: number; left: number } | null>(null);
 
   useEffect(() => {
     if (!open) return;
     function handleClick(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node) &&
+          buttonRef.current && !buttonRef.current.contains(e.target as Node)) {
         setOpen(false);
       }
     }
@@ -240,10 +243,22 @@ function UserMenu({ user }: { user?: { name?: string | null; image?: string | nu
     return () => document.removeEventListener("mousedown", handleClick);
   }, [open]);
 
+  function toggle() {
+    if (!open && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setMenuPos({
+        bottom: window.innerHeight - rect.top + 4,
+        left: rect.left,
+      });
+    }
+    setOpen((v) => !v);
+  }
+
   return (
-    <div className="relative" ref={menuRef}>
+    <>
       <button
-        onClick={() => setOpen((v) => !v)}
+        ref={buttonRef}
+        onClick={toggle}
         className="w-7 h-7 rounded-full overflow-hidden focus:outline-none focus:ring-2 focus:ring-primary"
         title={`Signed in as ${user?.name || "User"}`}
       >
@@ -259,8 +274,12 @@ function UserMenu({ user }: { user?: { name?: string | null; image?: string | nu
           </span>
         )}
       </button>
-      {open && (
-        <div className="absolute bottom-full left-0 mb-2 w-48 rounded-md border border-border bg-popover shadow-lg py-1 z-50">
+      {open && menuPos && (
+        <div
+          ref={menuRef}
+          className="fixed w-48 rounded-md border border-border bg-popover shadow-lg py-1 z-[100]"
+          style={{ bottom: menuPos.bottom, left: menuPos.left }}
+        >
           <div className="px-3 py-2 border-b border-border">
             <p className="text-sm font-medium text-foreground truncate">{user?.name || "User"}</p>
           </div>
@@ -272,7 +291,7 @@ function UserMenu({ user }: { user?: { name?: string | null; image?: string | nu
           </button>
         </div>
       )}
-    </div>
+    </>
   );
 }
 
