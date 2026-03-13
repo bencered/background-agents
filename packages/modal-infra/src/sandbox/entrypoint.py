@@ -90,7 +90,7 @@ class SandboxSupervisor:
     @property
     def base_branch(self) -> str:
         """The branch to clone/fetch — defaults to 'main'."""
-        return self.session_config.get("branch", "main")
+        return self.session_config.get("branch") or "main"
 
     def _build_repo_url(self, authenticated: bool = True) -> str:
         """Build the HTTPS URL for the repository, optionally with clone credentials."""
@@ -288,53 +288,71 @@ class SandboxSupervisor:
         if not package_json.exists():
             package_json.write_text('{"name": "opencode-tools", "type": "module"}')
 
-    def _setup_openai_oauth(self) -> None:
-        """Write OpenCode auth.json for ChatGPT OAuth if refresh token is configured."""
+    def _setup_opencode_auth(self) -> None:
+        """Write OpenCode auth.json for all configured providers.
+
+        Builds a unified auth.json from environment variables:
+        - OPENAI_OAUTH_REFRESH_TOKEN → OpenAI OAuth entry
+        - OPENCODE_ZEN_API_KEY → OpenCode Zen (pay-as-you-go) entry
+        - OPENCODE_GO_API_KEY → OpenCode Go (subscription) entry
+        """
+        auth_data: dict = {}
+
+        # OpenAI OAuth
         refresh_token = os.environ.get("OPENAI_OAUTH_REFRESH_TOKEN")
-        if not refresh_token:
+        if refresh_token:
+            openai_entry: dict = {
+                "type": "oauth",
+                "refresh": "managed-by-control-plane",
+                "access": "",
+                "expires": 0,
+            }
+            account_id = os.environ.get("OPENAI_OAUTH_ACCOUNT_ID")
+            if account_id:
+                openai_entry["accountId"] = account_id
+            auth_data["openai"] = openai_entry
+
+        # OpenCode Zen (pay-as-you-go)
+        zen_key = os.environ.get("OPENCODE_ZEN_API_KEY")
+        if zen_key:
+            auth_data["opencode"] = {"type": "api", "key": zen_key}
+
+        # OpenCode Go (subscription)
+        go_key = os.environ.get("OPENCODE_GO_API_KEY")
+        if go_key:
+            auth_data["opencode-go"] = {"type": "api", "key": go_key}
+
+        if not auth_data:
             return
 
         try:
             auth_dir = Path.home() / ".local" / "share" / "opencode"
             auth_dir.mkdir(parents=True, exist_ok=True)
 
-            openai_entry = {
-                "type": "oauth",
-                "refresh": "managed-by-control-plane",
-                "access": "",
-                "expires": 0,
-            }
-
-            account_id = os.environ.get("OPENAI_OAUTH_ACCOUNT_ID")
-            if account_id:
-                openai_entry["accountId"] = account_id
-
             auth_file = auth_dir / "auth.json"
             tmp_file = auth_dir / ".auth.json.tmp"
 
-            # Write to a temp file created with 0o600 from the start, then
-            # atomically rename so the target is never world-readable.
             fd = os.open(str(tmp_file), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
             try:
-                os.write(fd, json.dumps({"openai": openai_entry}).encode())
+                os.write(fd, json.dumps(auth_data).encode())
             finally:
                 os.close(fd)
             tmp_file.replace(auth_file)
 
-            self.log.info("openai_oauth.setup")
+            self.log.info("opencode_auth.setup", providers=list(auth_data.keys()))
         except Exception as e:
-            self.log.warn("openai_oauth.setup_error", exc=e)
+            self.log.warn("opencode_auth.setup_error", exc=e)
 
     async def start_opencode(self) -> None:
         """Start OpenCode server with configuration."""
-        self._setup_openai_oauth()
+        self._setup_opencode_auth()
         self.log.info("opencode.start")
 
         # Build OpenCode config from session settings
         # Model format is "provider/model", e.g. "anthropic/claude-sonnet-4-6"
         provider = self.session_config.get("provider", "anthropic")
         model = self.session_config.get("model", "claude-sonnet-4-6")
-        opencode_config = {
+        opencode_config: dict = {
             "model": f"{provider}/{model}",
             "permission": {
                 "*": {
@@ -342,6 +360,49 @@ class SandboxSupervisor:
                 },
             },
         }
+
+        # Inject MCP servers if configured
+        mcp_servers = self.session_config.get("mcp_servers")
+        if not mcp_servers:
+            # Fallback: fetch from control plane API
+            try:
+                cp_url = os.environ.get("CONTROL_PLANE_URL", "")
+                cp_secret = os.environ.get("INTERNAL_CALLBACK_SECRET", "")
+                if cp_url and cp_secret:
+                    import hashlib, hmac as _hmac, time as _time
+                    ts = str(int(_time.time() * 1000))
+                    sig = _hmac.new(cp_secret.encode(), ts.encode(), hashlib.sha256).hexdigest()
+                    token = f"{ts}.{sig}"
+                    resp = httpx.get(f"{cp_url}/mcp-servers", headers={"Authorization": f"Bearer {token}"}, timeout=5.0)
+                    if resp.status_code == 200:
+                        all_servers = resp.json()
+                        repo_full = f"{self.session_config.get('repo_owner', '')}/{self.session_config.get('repo_name', '')}".lower()
+                        mcp_servers = [
+                            s for s in all_servers
+                            if s.get("enabled") and (
+                                not s.get("repoScopes") or
+                                repo_full in [r.lower() for r in (s.get("repoScopes") or [])]
+                            )
+                        ]
+            except Exception:
+                pass
+
+        if mcp_servers:
+            mcp_config = {}
+            for server in mcp_servers:
+                name = server.get("name", "")
+                if not name:
+                    continue
+                if server.get("type") == "remote":
+                    mcp_config[name] = {"type": "remote", "url": server.get("url", "")}
+                else:
+                    cmd = server.get("command", [])
+                    entry: dict = {"command": cmd}
+                    if server.get("env"):
+                        entry["env"] = server["env"]
+                    mcp_config[name] = entry
+            if mcp_config:
+                opencode_config["mcp"] = mcp_config
 
         # Determine working directory - use repo path if cloned, otherwise /workspace
         workdir = self.workspace_path
@@ -358,6 +419,11 @@ class SandboxSupervisor:
             plugin_dir.mkdir(parents=True, exist_ok=True)
             shutil.copy(plugin_source, plugin_dir / "codex-auth-plugin.ts")
             self.log.info("openai_oauth.plugin_deployed")
+
+        # Write config to project .opencode directory as well
+        opencode_dir.mkdir(parents=True, exist_ok=True)
+        config_file = opencode_dir / "opencode.json"
+        config_file.write_text(json.dumps(opencode_config, indent=2))
 
         env = {
             **os.environ,
@@ -581,7 +647,7 @@ class SandboxSupervisor:
 
     async def _report_fatal_error(self, message: str) -> None:
         """Report a fatal error to the control plane."""
-        self.log.error("supervisor.fatal", message=message)
+        self.log.error("supervisor.fatal", error_message=message)
 
         if not self.control_plane_url:
             return
