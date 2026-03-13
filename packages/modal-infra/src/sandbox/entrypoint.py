@@ -96,7 +96,7 @@ class SandboxSupervisor:
     @property
     def base_branch(self) -> str:
         """The branch to clone/fetch — defaults to 'main'."""
-        return self.session_config.get("branch", "main")
+        return self.session_config.get("branch") or "main"
 
     def _build_repo_url(self, authenticated: bool = True) -> str:
         """Build the HTTPS URL for the repository, optionally with clone credentials."""
@@ -662,7 +662,7 @@ class SandboxSupervisor:
 
     async def _report_fatal_error(self, message: str) -> None:
         """Report a fatal error to the control plane."""
-        self.log.error("supervisor.fatal", message=message)
+        self.log.error("supervisor.fatal", error_message=message)
 
         if not self.control_plane_url:
             return

@@ -72,6 +72,7 @@ export class ModalSandboxProvider implements SandboxProvider {
           repoImageSha: config.repoImageSha,
           timeoutSeconds: config.timeoutSeconds,
           branch: config.branch,
+          mcpServers: config.mcpServers,
         },
         config.correlation
       );

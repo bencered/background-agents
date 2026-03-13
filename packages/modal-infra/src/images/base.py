@@ -24,7 +24,7 @@ OPENCODE_VERSION = "latest"
 
 # Cache buster - change this to force Modal image rebuild
 # v43: Force image rebuild - entrypoint debug logging + init fix
-CACHE_BUSTER = "v43-entrypoint-init-fix"
+CACHE_BUSTER = "v45-branch-null-fix"
 
 # Base image with all development tools
 base_image = (
@@ -97,7 +97,7 @@ base_image = (
     # Install OpenCode CLI and plugin for custom tools
     # CACHE_BUSTER is embedded in a no-op echo so Modal invalidates this layer on bump.
     .run_commands(
-        f"echo 'cache: {CACHE_BUSTER}' > /dev/null",
+        f"echo 'cache: {CACHE_BUSTER}' > /tmp/.cache-buster",
         "npm install -g opencode-ai@latest",
         "opencode --version || echo 'OpenCode installed'",
         # Install @opencode-ai/plugin globally for custom tools
@@ -114,7 +114,7 @@ base_image = (
         "mkdir -p /workspace",
         "mkdir -p /app/plugins",
         "mkdir -p /tmp/opencode",
-        "echo 'Image rebuilt at: v43-mcp-fix-2026-03-13T04' > /app/image-version.txt",
+        "echo 'Image rebuilt at: v44-copy-fix-2026-03-13T12' > /app/image-version.txt",
     )
     # Set environment variables (including cache buster to force rebuild)
     .env(
@@ -130,22 +130,16 @@ base_image = (
             "NODE_PATH": "/usr/lib/node_modules",
         }
     )
+    # Version stamp (before add_local_dir which must be last)
+    .run_commands(f"echo 'sandbox_version={CACHE_BUSTER}' > /app/.version")
     # Add sandbox code to the image (includes plugin at /app/sandbox/inspect-plugin.js)
+    # Must be LAST — Modal requires add_local_* after all run_commands
     .add_local_dir(
         str(SANDBOX_DIR),
         remote_path="/app/sandbox",
     )
-    .run_commands(f"echo 'sandbox_version={CACHE_BUSTER}' > /app/sandbox/.version")
 )
 
-# Image variant optimized for Node.js/TypeScript projects
-node_image = base_image.run_commands(
-    # Pre-cache common Node.js development dependencies
-    "npm cache clean --force",
-)
-
-# Image variant optimized for Python projects
-python_image = base_image.run_commands(
-    # Pre-create virtual environment
-    "uv venv /workspace/.venv",
-)
+# Image variants - same as base (add_local_dir must be last, can't add run_commands after)
+node_image = base_image
+python_image = base_image
