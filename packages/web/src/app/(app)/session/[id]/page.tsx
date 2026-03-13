@@ -22,6 +22,7 @@ import {
   SessionRightSidebarContent,
 } from "@/components/session-right-sidebar";
 import { ActionBar } from "@/components/action-bar";
+import { UsagePill } from "@/components/sidebar";
 import { copyToClipboard, formatModelNameLower } from "@/lib/format";
 import { SHORTCUT_LABELS } from "@/lib/keyboard-shortcuts";
 import { useMediaQuery } from "@/hooks/use-media-query";
@@ -588,6 +589,10 @@ function SessionContent({
             >
               Details
             </button>
+            <UsagePill
+              totalTokens={sessionState?.totalTokens}
+              totalCost={sessionState?.totalCost}
+            />
             {/* Mobile: single combined status dot */}
             <div className="md:hidden">
               <CombinedStatusDot

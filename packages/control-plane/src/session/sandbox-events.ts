@@ -22,6 +22,7 @@ interface SessionSandboxEventProcessorDeps {
   updateLastActivity: (timestamp: number) => void;
   scheduleInactivityCheck: () => Promise<void>;
   processMessageQueue: () => Promise<void>;
+  persistUsage: (tokens: number, cost: number) => void;
 }
 
 /** Event types that require delivery acknowledgement. */
@@ -68,6 +69,14 @@ export class SessionSandboxEventProcessor {
 
     if (event.type === "step_start" || event.type === "step_finish") {
       this.deps.updateLastActivity(now);
+      if (event.type === "step_finish") {
+        const t = event.tokens;
+        const tokens = t ? (t.input ?? 0) + (t.output ?? 0) + (t.reasoning ?? 0) : 0;
+        const cost = event.cost ?? 0;
+        if (tokens > 0 || cost > 0) {
+          this.deps.persistUsage(tokens, cost);
+        }
+      }
       this.deps.broadcast({ type: "sandbox_event", event });
       return;
     }

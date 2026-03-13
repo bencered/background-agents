@@ -14,6 +14,8 @@ export interface SessionEntry {
   spawnDepth?: number;
   automationId?: string | null;
   automationRunId?: string | null;
+  totalTokens?: number;
+  totalCost?: number;
   createdAt: number;
   updatedAt: number;
 }
@@ -32,6 +34,8 @@ interface SessionRow {
   spawn_depth: number;
   automation_id: string | null;
   automation_run_id: string | null;
+  total_tokens: number;
+  total_cost: number;
   created_at: number;
   updated_at: number;
 }
@@ -66,6 +70,8 @@ function toEntry(row: SessionRow): SessionEntry {
     spawnDepth: row.spawn_depth,
     automationId: row.automation_id,
     automationRunId: row.automation_run_id,
+    totalTokens: row.total_tokens ?? 0,
+    totalCost: row.total_cost ?? 0,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -167,6 +173,16 @@ export class SessionIndexStore {
       .bind(status, updatedAt, id, updatedAt)
       .run();
 
+    return (result.meta?.changes ?? 0) > 0;
+  }
+
+  async addUsage(id: string, tokens: number, cost: number): Promise<boolean> {
+    const result = await this.db
+      .prepare(
+        "UPDATE sessions SET total_tokens = total_tokens + ?, total_cost = total_cost + ?, updated_at = ? WHERE id = ?"
+      )
+      .bind(tokens, cost, Date.now(), id)
+      .run();
     return (result.meta?.changes ?? 0) > 0;
   }
 

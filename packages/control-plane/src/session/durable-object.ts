@@ -138,6 +138,9 @@ export class SessionDO extends DurableObject<Env> {
   private _alarmHandler: AlarmHandler | null = null;
   // Sandbox event processor (lazily initialized)
   private _sandboxEventProcessor: SessionSandboxEventProcessor | null = null;
+  /** In-memory cumulative usage counters (also persisted to D1). */
+  private _totalTokens = 0;
+  private _totalCost = 0;
 
   // Internal HTTP route table (transport wiring only; handlers remain on SessionDO).
   private readonly routes = createSessionInternalRoutes({
@@ -499,6 +502,7 @@ export class SessionDO extends DurableObject<Env> {
         updateLastActivity: (timestamp) => this.updateLastActivity(timestamp),
         scheduleInactivityCheck: () => this.scheduleInactivityCheck(),
         processMessageQueue: () => this.messageQueue.processMessageQueue(),
+        persistUsage: (tokens, cost) => this.persistUsageToD1(tokens, cost),
       });
     }
 
@@ -1358,6 +1362,25 @@ export class SessionDO extends DurableObject<Env> {
     );
   }
 
+  private persistUsageToD1(tokens: number, cost: number): void {
+    this._totalTokens += tokens;
+    this._totalCost += cost;
+    if (!this.env.DB) return;
+    const session = this.getSession();
+    if (!session) return;
+    const sessionStore = new SessionIndexStore(this.env.DB);
+    this.ctx.waitUntil(
+      sessionStore.addUsage(session.id, tokens, cost).catch((error) => {
+        this.log.error("session_index.add_usage.background_error", {
+          session_id: session.id,
+          tokens,
+          cost,
+          error,
+        });
+      })
+    );
+  }
+
   private async transitionSessionStatus(status: SessionStatus): Promise<boolean> {
     const session = this.getSession();
     if (!session) return false;
@@ -1451,6 +1474,8 @@ export class SessionDO extends DurableObject<Env> {
       reasoningEffort: session?.reasoning_effort ?? undefined,
       isProcessing,
       parentSessionId: session?.parent_session_id ?? null,
+      totalTokens: this._totalTokens,
+      totalCost: this._totalCost,
     };
   }
 

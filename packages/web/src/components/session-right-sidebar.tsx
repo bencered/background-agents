@@ -7,6 +7,7 @@ import {
   MetadataSection,
   TasksSection,
   FilesChangedSection,
+  UsageSection,
 } from "./sidebar";
 import { ChildSessionsSection } from "./sidebar/child-sessions-section";
 import { extractLatestTasks } from "@/lib/tasks";
@@ -65,6 +66,16 @@ export function SessionRightSidebarContent({
           parentSessionId={sessionState.parentSessionId}
         />
       </div>
+
+      {/* Usage */}
+      {(sessionState.totalTokens || sessionState.totalCost) ? (
+        <div className="px-4 py-4 border-b border-border-muted">
+          <UsageSection
+            totalTokens={sessionState.totalTokens}
+            totalCost={sessionState.totalCost}
+          />
+        </div>
+      ) : null}
 
       {/* Tasks */}
       {tasks.length > 0 && (

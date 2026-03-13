@@ -168,7 +168,7 @@ export type SandboxEvent =
   | {
       type: "step_finish";
       cost?: number;
-      tokens?: number;
+      tokens?: { input?: number; output?: number; reasoning?: number; cache?: { read?: number; write?: number } };
       reason?: string;
       messageId: string;
       sandboxId: string;
@@ -319,6 +319,8 @@ export interface SessionState {
   reasoningEffort?: string;
   isProcessing?: boolean;
   parentSessionId?: string | null;
+  totalTokens?: number;
+  totalCost?: number;
 }
 
 // Participant presence info

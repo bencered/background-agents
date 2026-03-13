@@ -289,3 +289,17 @@ variable "allowed_email_domains" {
   type        = string
   default     = ""
 }
+
+variable "opencode_zen_api_key" {
+  description = "OpenCode Zen API key (pay-as-you-go models)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "opencode_go_api_key" {
+  description = "OpenCode Go API key (subscription models)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
