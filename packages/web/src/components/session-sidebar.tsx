@@ -229,7 +229,7 @@ function UserMenu({ user }: { user?: { name?: string | null; image?: string | nu
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
-  const [menuPos, setMenuPos] = useState<{ bottom: number; left: number } | null>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -247,7 +247,7 @@ function UserMenu({ user }: { user?: { name?: string | null; image?: string | nu
     if (!open && buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
       setMenuPos({
-        bottom: window.innerHeight - rect.top + 4,
+        top: rect.bottom + 4,
         left: rect.left,
       });
     }
@@ -278,7 +278,7 @@ function UserMenu({ user }: { user?: { name?: string | null; image?: string | nu
         <div
           ref={menuRef}
           className="fixed w-48 rounded-md border border-border bg-popover shadow-lg py-1 z-[100]"
-          style={{ bottom: menuPos.bottom, left: menuPos.left }}
+          style={{ top: menuPos.top, left: menuPos.left }}
         >
           <div className="px-3 py-2 border-b border-border">
             <p className="text-sm font-medium text-foreground truncate">{user?.name || "User"}</p>
