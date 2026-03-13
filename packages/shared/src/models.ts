@@ -154,6 +154,8 @@ export const DEFAULT_ENABLED_MODELS: ValidModel[] = [
   "openai/gpt-5.2-codex",
   "openai/gpt-5.3-codex",
   "openai/gpt-5.3-codex-spark",
+  "opencode/glm-5",
+  "opencode-go/glm-5",
 ];
 
 // === Normalization ===

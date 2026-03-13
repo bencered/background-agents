@@ -68,14 +68,12 @@ export function SessionRightSidebarContent({
       </div>
 
       {/* Usage */}
-      {(sessionState.totalTokens || sessionState.totalCost) ? (
-        <div className="px-4 py-4 border-b border-border-muted">
-          <UsageSection
-            totalTokens={sessionState.totalTokens}
-            totalCost={sessionState.totalCost}
-          />
-        </div>
-      ) : null}
+      <div className="px-4 py-4 border-b border-border-muted">
+        <UsageSection
+          totalTokens={sessionState.totalTokens}
+          totalCost={sessionState.totalCost}
+        />
+      </div>
 
       {/* Tasks */}
       {tasks.length > 0 && (

@@ -19,7 +19,6 @@ function formatCost(n: number): string {
 }
 
 export function UsageSection({ totalTokens = 0, totalCost = 0 }: UsageSectionProps) {
-  if (totalTokens === 0 && totalCost === 0) return null;
 
   return (
     <div className="space-y-2">
@@ -43,7 +42,6 @@ export function UsageSection({ totalTokens = 0, totalCost = 0 }: UsageSectionPro
 
 /** Compact inline usage for the header bar */
 export function UsagePill({ totalTokens = 0, totalCost = 0 }: UsageSectionProps) {
-  if (totalTokens === 0 && totalCost === 0) return null;
 
   return (
     <span className="text-xs text-muted-foreground font-mono">

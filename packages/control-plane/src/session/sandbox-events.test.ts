@@ -55,6 +55,7 @@ function createProcessor() {
     updateLastActivity,
     scheduleInactivityCheck,
     processMessageQueue,
+    persistUsage: vi.fn(),
   });
 
   return {
