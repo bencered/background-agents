@@ -519,29 +519,26 @@ function RepoMappingSection({
                 </Select>
               </label>
 
-              <div className="grid sm:grid-cols-2 gap-3">
-                <label className="text-sm">
-                  <span className="block text-foreground font-medium mb-1">
-                    Label filter{" "}
-                    <span className="text-muted-foreground font-normal">(optional)</span>
-                  </span>
-                  <Input
-                    value={newLabelFilter}
-                    onChange={(e) => setNewLabelFilter(e.target.value)}
-                    placeholder="e.g. backend"
-                  />
-                </label>
-
-                <div className="flex items-end pb-1">
-                  <label className="flex items-center gap-2 text-sm cursor-pointer">
-                    <Checkbox
-                      checked={newIsDefault}
-                      onCheckedChange={(checked) => setNewIsDefault(!!checked)}
+              <details className="text-sm">
+                <summary className="text-muted-foreground cursor-pointer hover:text-foreground transition select-none">
+                  Advanced options
+                </summary>
+                <div className="mt-2 space-y-2">
+                  <label>
+                    <span className="block text-foreground font-medium mb-1">
+                      Label filter
+                    </span>
+                    <span className="block text-xs text-muted-foreground mb-1.5">
+                      Only route issues with this Linear label to the repo above. Leave empty to route all issues.
+                    </span>
+                    <Input
+                      value={newLabelFilter}
+                      onChange={(e) => setNewLabelFilter(e.target.value)}
+                      placeholder="e.g. backend"
                     />
-                    <span>Default mapping</span>
                   </label>
                 </div>
-              </div>
+              </details>
 
               <div className="flex items-center gap-2 pt-1">
                 <Button onClick={handleCreate} disabled={saving || !newRepo}>
@@ -668,28 +665,24 @@ function RepoMappingRow({
           </Select>
         </label>
 
-        <div className="grid sm:grid-cols-2 gap-3">
-          <label className="text-sm">
-            <span className="block text-foreground font-medium mb-1">
-              Label filter <span className="text-muted-foreground font-normal">(optional)</span>
-            </span>
-            <Input
-              value={editLabelFilter}
-              onChange={(e) => setEditLabelFilter(e.target.value)}
-              placeholder="e.g. backend"
-            />
-          </label>
-
-          <div className="flex items-end pb-1">
-            <label className="flex items-center gap-2 text-sm cursor-pointer">
-              <Checkbox
-                checked={editIsDefault}
-                onCheckedChange={(checked) => setEditIsDefault(!!checked)}
+        <details className="text-sm" open={!!editLabelFilter}>
+          <summary className="text-muted-foreground cursor-pointer hover:text-foreground transition select-none">
+            Advanced options
+          </summary>
+          <div className="mt-2">
+            <label>
+              <span className="block text-foreground font-medium mb-1">Label filter</span>
+              <span className="block text-xs text-muted-foreground mb-1.5">
+                Only route issues with this Linear label to the repo above. Leave empty to route all issues.
+              </span>
+              <Input
+                value={editLabelFilter}
+                onChange={(e) => setEditLabelFilter(e.target.value)}
+                placeholder="e.g. backend"
               />
-              <span>Default mapping</span>
             </label>
           </div>
-        </div>
+        </details>
 
         <div className="flex items-center gap-2">
           <Button size="sm" onClick={handleSave} disabled={saving || !editRepo}>
