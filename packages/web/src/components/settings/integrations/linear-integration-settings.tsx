@@ -317,7 +317,6 @@ function RepoMappingSection({
   linearProjects: LinearProject[];
 }) {
   const [adding, setAdding] = useState(false);
-  const [step, setStep] = useState<1 | 2>(1);
 
   // New mapping form state
   const [newSourceType, setNewSourceType] = useState<"team" | "project">("team");
@@ -337,7 +336,6 @@ function RepoMappingSection({
     setNewLabelFilter("");
     setNewIsDefault(false);
     setAdding(false);
-    setStep(1);
   };
 
   const handleCreate = async () => {
@@ -406,153 +404,86 @@ function RepoMappingSection({
       )}
 
       {adding ? (
-        <div className="border border-border rounded-md p-4 space-y-4">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span className={step === 1 ? "text-foreground font-medium" : ""}>1. Source</span>
-            <span>→</span>
-            <span className={step === 2 ? "text-foreground font-medium" : ""}>2. Target</span>
-          </div>
-
-          {step === 1 && (
-            <div className="space-y-3">
-              <div className="flex gap-2">
-                <button
-                  onClick={() => {
-                    setNewSourceType("team");
-                    setNewSourceId("");
-                  }}
-                  className={`flex-1 px-3 py-2 text-sm rounded-md border transition ${
-                    newSourceType === "team"
-                      ? "border-foreground/30 bg-muted text-foreground font-medium"
-                      : "border-border text-muted-foreground hover:border-foreground/20"
-                  }`}
-                >
-                  Teams
-                </button>
-                <button
-                  onClick={() => {
-                    setNewSourceType("project");
-                    setNewSourceId("");
-                  }}
-                  className={`flex-1 px-3 py-2 text-sm rounded-md border transition ${
-                    newSourceType === "project"
-                      ? "border-foreground/30 bg-muted text-foreground font-medium"
-                      : "border-border text-muted-foreground hover:border-foreground/20"
-                  }`}
-                >
-                  Projects
-                </button>
-              </div>
-
-              {sourceOptions.length === 0 ? (
-                <p className="text-sm text-muted-foreground px-3 py-6 text-center border border-dashed border-border rounded-md">
-                  No {newSourceType === "team" ? "teams" : "projects"} found. Make sure the Linear
-                  agent is authorized in your workspace.
-                </p>
-              ) : (
-                <ScrollFade borderClass="border border-border rounded-md overflow-hidden" scrollClass="max-h-48 overflow-y-auto divide-y divide-border">
-                  {sourceOptions.map((s) => {
-                    const team = s as LinearTeam;
-                    return (
-                      <button
-                        key={s.id}
-                        onClick={() => {
-                          setNewSourceId(s.id);
-                          setStep(2);
-                        }}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition hover:bg-muted/50 ${
-                          newSourceId === s.id ? "bg-muted" : ""
-                        }`}
-                      >
-                        <SourceBadge
-                          icon={s.icon}
-                          color={s.color}
-                          name={s.name}
-                          detail={team.key ? team.key : undefined}
-                          sourceType={newSourceType}
-                        />
-                      </button>
-                    );
-                  })}
-                </ScrollFade>
-              )}
-
-              <div className="flex justify-end">
-                <Button variant="outline" size="sm" onClick={resetForm}>
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {step === 2 && selectedSource && (
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-md">
-                <SourceBadge
-                  icon={selectedSource.icon}
-                  color={selectedSource.color}
-                  name={selectedSource.name}
-                  detail={(selectedSource as LinearTeam).key}
-                  sourceType={newSourceType}
-                />
-                <button
-                  onClick={() => setStep(1)}
-                  className="ml-auto text-xs text-muted-foreground hover:text-foreground"
-                >
-                  Change
-                </button>
-              </div>
-
-              <label className="text-sm">
-                <span className="block text-foreground font-medium mb-1">Repository</span>
-                <Select value={newRepo} onValueChange={setNewRepo}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select a repository..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableRepos.map((r) => (
-                      <SelectItem key={r.fullName} value={r.fullName.toLowerCase()}>
-                        {r.fullName}
+        <div className="border border-border rounded-md p-4 space-y-3">
+          <div className="flex items-center gap-3">
+            <Select
+              value={newSourceId ? `${newSourceType}:${newSourceId}` : ""}
+              onValueChange={(val) => {
+                const [type, ...idParts] = val.split(":");
+                setNewSourceType(type as "team" | "project");
+                setNewSourceId(idParts.join(":"));
+              }}
+            >
+              <SelectTrigger className="flex-1">
+                <SelectValue placeholder="Linear team or project..." />
+              </SelectTrigger>
+              <SelectContent>
+                {linearTeams.length > 0 && (
+                  <SelectGroup>
+                    <SelectLabel>Teams</SelectLabel>
+                    {linearTeams.map((t) => (
+                      <SelectItem key={t.id} value={`team:${t.id}`}>
+                        {t.name}
                       </SelectItem>
                     ))}
-                  </SelectContent>
-                </Select>
+                  </SelectGroup>
+                )}
+                {linearProjects.length > 0 && (
+                  <SelectGroup>
+                    <SelectLabel>Projects</SelectLabel>
+                    {linearProjects.map((p) => (
+                      <SelectItem key={p.id} value={`project:${p.id}`}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                )}
+              </SelectContent>
+            </Select>
+
+            <span className="text-muted-foreground text-sm shrink-0">→</span>
+
+            <Select value={newRepo} onValueChange={setNewRepo}>
+              <SelectTrigger className="flex-1">
+                <SelectValue placeholder="GitHub repository..." />
+              </SelectTrigger>
+              <SelectContent>
+                {availableRepos.map((r) => (
+                  <SelectItem key={r.fullName} value={r.fullName.toLowerCase()}>
+                    {r.fullName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <details className="text-sm">
+            <summary className="text-muted-foreground cursor-pointer hover:text-foreground transition select-none">
+              Advanced
+            </summary>
+            <div className="mt-2">
+              <label>
+                <span className="block text-foreground font-medium mb-1">Label filter</span>
+                <span className="block text-xs text-muted-foreground mb-1.5">
+                  Only route issues with this Linear label to the selected repo.
+                </span>
+                <Input
+                  value={newLabelFilter}
+                  onChange={(e) => setNewLabelFilter(e.target.value)}
+                  placeholder="e.g. backend"
+                />
               </label>
-
-              <details className="text-sm">
-                <summary className="text-muted-foreground cursor-pointer hover:text-foreground transition select-none">
-                  Advanced options
-                </summary>
-                <div className="mt-2 space-y-2">
-                  <label>
-                    <span className="block text-foreground font-medium mb-1">
-                      Label filter
-                    </span>
-                    <span className="block text-xs text-muted-foreground mb-1.5">
-                      Only route issues with this Linear label to the repo above. Leave empty to route all issues.
-                    </span>
-                    <Input
-                      value={newLabelFilter}
-                      onChange={(e) => setNewLabelFilter(e.target.value)}
-                      placeholder="e.g. backend"
-                    />
-                  </label>
-                </div>
-              </details>
-
-              <div className="flex items-center gap-2 pt-1">
-                <Button onClick={handleCreate} disabled={saving || !newRepo}>
-                  {saving ? "Adding..." : "Add Mapping"}
-                </Button>
-                <Button variant="outline" onClick={() => setStep(1)} disabled={saving}>
-                  Back
-                </Button>
-                <Button variant="outline" onClick={resetForm} disabled={saving}>
-                  Cancel
-                </Button>
-              </div>
             </div>
-          )}
+          </details>
+
+          <div className="flex items-center gap-2">
+            <Button size="sm" onClick={handleCreate} disabled={saving || !newSourceId || !newRepo}>
+              {saving ? "Adding..." : "Add"}
+            </Button>
+            <Button size="sm" variant="outline" onClick={resetForm} disabled={saving}>
+              Cancel
+            </Button>
+          </div>
         </div>
       ) : (
         <Button variant="outline" onClick={() => setAdding(true)} className="gap-1.5">
