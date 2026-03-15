@@ -310,13 +310,10 @@ function SourceIcon({ icon, color, fallback }: { icon?: string | null; color?: s
   const resolved = resolveLinearIcon(icon);
   return (
     <span
-      className="inline-flex items-center justify-center w-5 h-5 rounded text-xs shrink-0"
-      style={{
-        backgroundColor: color ? `${color}18` : "var(--color-muted)",
-        color: color ?? "var(--color-muted-foreground)",
-      }}
+      className="inline-flex items-center justify-center w-4 h-4 shrink-0 text-sm"
+      style={{ color: color ?? "var(--color-muted-foreground)" }}
     >
-      {resolved ? (typeof resolved === "string" ? resolved : createElement(resolved, { size: 11 })) : fallback}
+      {resolved ? (typeof resolved === "string" ? resolved : createElement(resolved, { size: 14 })) : fallback}
     </span>
   );
 }
