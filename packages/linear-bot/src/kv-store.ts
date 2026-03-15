@@ -7,9 +7,9 @@ import type {
   TriggerConfig,
   TeamRepoMapping,
   ProjectRepoMapping,
-  UserPreferences,
   IssueSession,
 } from "./types";
+import type { z } from "zod";
 import {
   TeamRepoMappingSchema,
   ProjectRepoMappingSchema,
@@ -68,7 +68,7 @@ export async function getTriggerConfig(env: Env): Promise<TriggerConfig> {
 export async function getUserPreferences(
   env: Env,
   userId: string
-): Promise<UserPreferences | null> {
+): Promise<z.infer<typeof UserPreferencesSchema> | null> {
   try {
     const data = await env.LINEAR_KV.get(`user_prefs:${userId}`, "json");
     if (!data) return null;

@@ -93,7 +93,7 @@ app.post("/webhook", async (c) => {
 
   // Verify signature using the official SDK
   const webhookClient = new LinearWebhookClient(c.env.LINEAR_WEBHOOK_SECRET);
-  const isValid = await webhookClient.verify(body, signature ?? "");
+  const isValid = await webhookClient.verify(Buffer.from(body), signature ?? "");
   if (!isValid) {
     log.warn("http.request", {
       trace_id: traceId,

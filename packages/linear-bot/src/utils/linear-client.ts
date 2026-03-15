@@ -3,7 +3,7 @@
  */
 
 import { LinearClient } from "@linear/sdk";
-import type { AgentActivityCreateInput } from "@linear/sdk";
+// AgentActivityCreateInput is declared but not exported from @linear/sdk
 import type { Env, LinearIssueDetails } from "../types";
 import { OAuthTokenResponseSchema, StoredTokenDataSchema } from "../schemas";
 import { timingSafeEqual } from "@open-inspect/shared";
@@ -146,16 +146,16 @@ export async function getLinearClient(env: Env, orgId: string): Promise<LinearCl
 export async function emitAgentActivity(
   client: LinearClient,
   agentSessionId: string,
-  content: AgentActivityCreateInput["content"],
+  content: Record<string, unknown>,
   ephemeral?: boolean,
   signal?: string,
   signalMetadata?: Record<string, unknown>
 ): Promise<void> {
   try {
-    const input: AgentActivityCreateInput = { agentSessionId, content, ephemeral };
+    const input: Record<string, unknown> = { agentSessionId, content, ephemeral };
     if (signal) input.signal = signal;
     if (signalMetadata) input.signalMetadata = signalMetadata;
-    await client.createAgentActivity(input);
+    await (client.createAgentActivity as (input: Record<string, unknown>) => Promise<unknown>)(input);
   } catch (err) {
     log.error("linear.emit_activity_failed", {
       agent_session_id: agentSessionId,
@@ -300,8 +300,8 @@ export async function getRepoSuggestions(
   candidateRepos: Array<{ hostname: string; repositoryFullName: string }>
 ): Promise<Array<{ repositoryFullName: string; confidence: number }>> {
   try {
-    const result = await client.issueRepositorySuggestions(issueId, agentSessionId, candidateRepos);
-    return result.suggestions.map((s) => ({
+    const result = await (client as any).issueRepositorySuggestions(issueId, agentSessionId, candidateRepos);
+    return result.suggestions.map((s: any) => ({
       repositoryFullName: s.repositoryFullName,
       confidence: s.confidence,
     }));

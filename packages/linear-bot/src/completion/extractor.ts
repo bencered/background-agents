@@ -14,6 +14,8 @@ import { generateInternalToken } from "../utils/internal";
 import { createLogger } from "../logger";
 import { ListEventsResponseSchema, ListArtifactsResponseSchema } from "../schemas";
 
+interface EventResponse { id: string; type: string; createdAt: string | number; data: Record<string, unknown>; messageId?: string }
+
 const log = createLogger("extractor");
 
 const EVENTS_PAGE_LIMIT = 200;
@@ -129,7 +131,7 @@ async function fetchSessionArtifacts(
     return data.artifacts.map((a) => ({
       type: a.type,
       url: a.url ? String(a.url) : "",
-      label: getArtifactLabelFromArtifact(a.type, a.metadata),
+      label: getArtifactLabelFromArtifact(a.type, a.metadata ?? null),
       metadata: a.metadata ?? null,
     }));
   } catch (error) {

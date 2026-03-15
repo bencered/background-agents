@@ -99,7 +99,7 @@ async function getFromCacheOrFallback(env: Env): Promise<RepoConfig[]> {
     const cached = await env.LINEAR_KV.get("repos:cache", "json");
     if (cached && Array.isArray(cached)) {
       log.info("control_plane.fetch_repos", { source: "kv_cache" });
-      return RepoConfigArraySchema.parse(cached);
+      return RepoConfigArraySchema.parse(cached) as RepoConfig[];
     }
   } catch (e) {
     log.warn("kv.get", {

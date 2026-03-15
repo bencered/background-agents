@@ -175,7 +175,7 @@ export const StoredTokenDataSchema = z.object({
 
 /** Matches shared RepoConfig (used for KV cache reads). */
 export const RepoConfigSchema = z.object({
-  id: z.union([z.string(), z.number()]),
+  id: z.union([z.string(), z.number()]).transform(String),
   owner: z.string(),
   name: z.string(),
   fullName: z.string(),

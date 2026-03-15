@@ -3,7 +3,9 @@
  * These test the routing decisions, not the full handler execution.
  */
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import type { AgentSessionWebhook, Env, IssueSession } from "../types";
+import type { Env, IssueSession } from "../types";
+
+// Test fixtures use `any` type — partial webhook objects
 import type { PendingClassification } from "../kv-store";
 
 // Mock all dependencies
@@ -61,7 +63,7 @@ vi.mock("../plan", () => ({
 const linearClient = await import("../utils/linear-client");
 const { handleAgentSessionEvent } = await import("../webhook-handler");
 
-function makeIssue(overrides: Partial<AgentSessionWebhook["agentSession"]["issue"]> = {}) {
+function makeIssue(overrides: Record<string, any> = {}) {
   return {
     id: "issue-1",
     identifier: "ENG-1",
@@ -75,7 +77,7 @@ function makeIssue(overrides: Partial<AgentSessionWebhook["agentSession"]["issue
   };
 }
 
-function makeWebhook(overrides: Partial<AgentSessionWebhook> = {}): AgentSessionWebhook {
+function makeWebhook(overrides: Record<string, any> = {}): any {
   return {
     type: "AgentSessionEvent",
     action: "created",
@@ -458,7 +460,7 @@ describe("handleAgentSessionEvent — dispatcher routing", () => {
 
       // Verify the body contains habakkuk
       const sessionCall = mockControlPlaneFetch.mock.calls.find(
-        (c: [string, RequestInit]) => c[0].includes("/sessions") && c[1]?.method === "POST"
+        (c: any) => c[0].includes("/sessions") && c[1]?.method === "POST"
       );
       expect(sessionCall).toBeDefined();
       const body = JSON.parse(sessionCall![1].body as string);
@@ -506,7 +508,7 @@ describe("handleAgentSessionEvent — dispatcher routing", () => {
 
       // Should NEVER create a session on bencered/dom
       const sessionCalls = mockControlPlaneFetch.mock.calls.filter(
-        (c: [string, RequestInit]) => c[0].includes("/sessions") && c[1]?.method === "POST"
+        (c: any) => c[0].includes("/sessions") && c[1]?.method === "POST"
       );
       for (const call of sessionCalls) {
         const body = JSON.parse(call[1].body as string);
@@ -538,7 +540,7 @@ describe("handleAgentSessionEvent — dispatcher routing", () => {
 
       // Should auto-select the only repo
       const sessionCall = mockControlPlaneFetch.mock.calls.find(
-        (c: [string, RequestInit]) => c[0].includes("/sessions") && c[1]?.method === "POST"
+        (c: any) => c[0].includes("/sessions") && c[1]?.method === "POST"
       );
       expect(sessionCall).toBeDefined();
       const body = JSON.parse(sessionCall![1].body as string);
@@ -555,7 +557,7 @@ describe("handleAgentSessionEvent — dispatcher routing", () => {
           action: "created",
           organizationId: "org-1",
           agentSession: { id: "session-1" },
-        },
+        } as any,
         makeEnv(),
         "trace-1"
       );

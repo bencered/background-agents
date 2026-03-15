@@ -268,7 +268,7 @@ callbacksRouter.post("/tool_call", async (c) => {
           agent_session_id: context.agentSessionId,
           tool: payload.tool,
           outcome: "success",
-          plan_updated: changed,
+          plan_updated: payload.tool.toLowerCase() === "todowrite",
           duration_ms: Date.now() - processStart,
         });
       } catch (e) {

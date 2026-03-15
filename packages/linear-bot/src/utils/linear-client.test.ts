@@ -23,7 +23,7 @@ const { emitAgentActivity, getTeamStartedState, updateIssue, getAppUserId, getRe
   await import("./linear-client");
 
 // Get the mock client instance
-const { __mockClient: mockClient } = await import("@linear/sdk") as { __mockClient: ReturnType<typeof vi.fn> & Record<string, ReturnType<typeof vi.fn>> };
+const { __mockClient: mockClient } = await import("@linear/sdk") as unknown as { __mockClient: ReturnType<typeof vi.fn> & Record<string, ReturnType<typeof vi.fn>> };
 
 function makeClient(): LinearClient {
   return new LinearClient({ accessToken: "test" });

@@ -59,14 +59,6 @@ function getActivityBody(webhook: Webhook): string | undefined {
   return typeof c.body === "string" ? c.body : undefined;
 }
 
-/** Extract content type from the opaque agentActivity.content field. */
-function getActivityContentType(webhook: Webhook): string | undefined {
-  const content = webhook.agentActivity?.content;
-  if (!content || typeof content !== "object") return undefined;
-  const c = content as Record<string, unknown>;
-  return typeof c.type === "string" ? c.type : undefined;
-}
-
 export function escapeHtml(s: string): string {
   return s
     .replace(/&/g, "&amp;")
@@ -173,7 +165,7 @@ async function handleFollowUp(
     );
     if (eventsRes.ok) {
       const eventsData = SessionEventsResponseSchema.parse(await eventsRes.json());
-      const recentTokens = eventsData.events.filter((e) => e.type === "token").slice(-1);
+      const recentTokens = eventsData.events.filter((e: { type: string }) => e.type === "token").slice(-1);
       if (recentTokens.length > 0) {
         const lastContent = String(recentTokens[0].data.content ?? "");
         if (lastContent) {
@@ -480,9 +472,9 @@ async function handleNewSession(
 
   // Fetch full issue details for context
   const issueDetails = await fetchIssueDetails(client, issue.id);
-  const labels = issueDetails?.labels || issue.labels || [];
-  const labelNames = labels.map((l) => l.name);
-  const projectInfo = issueDetails?.project || issue.project;
+  const labels = issueDetails?.labels || [];
+  const labelNames = labels.map((l: { name: string }) => l.name);
+  const projectInfo = issueDetails?.project || null;
 
   // ─── Resolve repo ─────────────────────────────────────────────────────
 
