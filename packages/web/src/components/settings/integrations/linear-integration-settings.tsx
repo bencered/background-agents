@@ -180,6 +180,91 @@ export function LinearIntegrationSettings() {
   );
 }
 
+// ─── Linear Icon Resolution ───────────────────────────────────────────────────
+
+const LINEAR_ICON_MAP: Record<string, string> = {
+  Calculator: "🧮",
+  Megaphone: "📣",
+  MobilePhone: "📱",
+  Page: "📄",
+  Edge: "🔷",
+  Magnet: "🧲",
+  Rocket: "🚀",
+  Bug: "🐛",
+  Bolt: "⚡",
+  Star: "⭐",
+  Heart: "❤️",
+  Flag: "🚩",
+  Globe: "🌍",
+  Lock: "🔒",
+  Key: "🔑",
+  Gear: "⚙️",
+  Code: "💻",
+  Palette: "🎨",
+  Book: "📚",
+  Folder: "📁",
+  Shield: "🛡️",
+  Target: "🎯",
+  Trophy: "🏆",
+  Music: "🎵",
+  Camera: "📷",
+  Map: "🗺️",
+  Clock: "🕐",
+  Calendar: "📅",
+  Mail: "📧",
+  Chat: "💬",
+  Search: "🔍",
+  Home: "🏠",
+  Box: "📦",
+  Cloud: "☁️",
+  Database: "🗄️",
+  Wrench: "🔧",
+  Hammer: "🔨",
+  Fire: "🔥",
+  Eye: "👁️",
+  Crown: "👑",
+  Diamond: "💎",
+  Gift: "🎁",
+  Bell: "🔔",
+  Pin: "📌",
+  Link: "🔗",
+  Tag: "🏷️",
+};
+
+const SHORTCODE_MAP: Record<string, string> = {
+  "female-detective": "🕵️‍♀️",
+  detective: "🕵️",
+  rocket: "🚀",
+  fire: "🔥",
+  star: "⭐",
+  sparkles: "✨",
+  bug: "🐛",
+  wrench: "🔧",
+  gear: "⚙️",
+  bulb: "💡",
+  zap: "⚡",
+  dart: "🎯",
+  trophy: "🏆",
+  hammer: "🔨",
+  microscope: "🔬",
+  robot: "🤖",
+  brain: "🧠",
+  eyes: "👀",
+  tada: "🎉",
+  boom: "💥",
+  rainbow: "🌈",
+  unicorn: "🦄",
+};
+
+function resolveLinearIcon(icon: string | null | undefined): string | null {
+  if (!icon) return null;
+  if (icon.startsWith(":") && icon.endsWith(":")) {
+    const code = icon.slice(1, -1).toLowerCase();
+    return SHORTCODE_MAP[code] ?? null;
+  }
+  return LINEAR_ICON_MAP[icon] ?? null;
+}
+
 // ─── Source Identity Badge ─────────────────────────────────────────────────────
 
 function SourceBadge({
@@ -195,6 +280,9 @@ function SourceBadge({
   detail?: string;
   sourceType: "team" | "project";
 }) {
+  const resolvedIcon = resolveLinearIcon(icon);
+  const fallback = sourceType === "team" ? "T" : "P";
+
   return (
     <div className="flex items-center gap-2 min-w-0">
       <span
@@ -204,7 +292,7 @@ function SourceBadge({
           color: color ?? "var(--color-muted-foreground)",
         }}
       >
-        {icon ?? (sourceType === "team" ? "T" : "P")}
+        {resolvedIcon ?? fallback}
       </span>
       <div className="min-w-0">
         <span className="text-sm font-medium text-foreground truncate block">{name}</span>
@@ -355,14 +443,8 @@ function RepoMappingSection({
 
               {sourceOptions.length === 0 ? (
                 <p className="text-sm text-muted-foreground px-3 py-6 text-center border border-dashed border-border rounded-md">
-                  No {newSourceType === "team" ? "teams" : "projects"} found.{" "}
-                  <a
-                    href="/api/linear/oauth/authorize"
-                    className="text-foreground underline underline-offset-2"
-                  >
-                    Authorize Linear
-                  </a>{" "}
-                  to load them.
+                  No {newSourceType === "team" ? "teams" : "projects"} found. Make sure the Linear
+                  agent is authorized in your workspace.
                 </p>
               ) : (
                 <div className="max-h-48 overflow-y-auto border border-border rounded-md divide-y divide-border">
