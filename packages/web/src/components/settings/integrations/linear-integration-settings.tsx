@@ -182,81 +182,33 @@ export function LinearIntegrationSettings() {
 
 // ─── Linear Icon Resolution ───────────────────────────────────────────────────
 
-const LINEAR_ICON_MAP: Record<string, string> = {
-  Calculator: "🧮",
-  Megaphone: "📣",
-  MobilePhone: "📱",
-  Page: "📄",
-  Edge: "🔷",
-  Magnet: "🧲",
-  Rocket: "🚀",
-  Bug: "🐛",
-  Bolt: "⚡",
-  Star: "⭐",
-  Heart: "❤️",
-  Flag: "🚩",
-  Globe: "🌍",
-  Lock: "🔒",
-  Key: "🔑",
-  Gear: "⚙️",
-  Code: "💻",
-  Palette: "🎨",
-  Book: "📚",
-  Folder: "📁",
-  Shield: "🛡️",
-  Target: "🎯",
-  Trophy: "🏆",
-  Music: "🎵",
-  Camera: "📷",
-  Map: "🗺️",
-  Clock: "🕐",
-  Calendar: "📅",
-  Mail: "📧",
-  Chat: "💬",
-  Search: "🔍",
-  Home: "🏠",
-  Box: "📦",
-  Cloud: "☁️",
-  Database: "🗄️",
-  Wrench: "🔧",
-  Hammer: "🔨",
-  Fire: "🔥",
-  Eye: "👁️",
-  Crown: "👑",
-  Diamond: "💎",
-  Gift: "🎁",
-  Bell: "🔔",
-  Pin: "📌",
-  Link: "🔗",
-  Tag: "🏷️",
+import {
+  Calculator, Megaphone, Smartphone, FileText, Hexagon, Magnet, Rocket, Bug, Zap,
+  Star, Heart, Flag, Globe, Lock, Key, Settings, Code, Palette, BookOpen, Folder,
+  Shield, Target, Trophy, Music, Camera, Map, Clock, Calendar, Mail, MessageCircle,
+  Search, Home, Package, Cloud, Database, Wrench, Hammer, Flame, Eye, Crown,
+  Diamond, Gift, Bell, Pin, Link, Tag, Sparkles, Lightbulb, Microscope, Bot,
+  Brain, PartyPopper, Rainbow, type LucideIcon,
+} from "lucide-react";
+
+const LINEAR_ICON_MAP: Record<string, LucideIcon> = {
+  Calculator, Megaphone, MobilePhone: Smartphone, Page: FileText, Edge: Hexagon,
+  Magnet, Rocket, Bug, Bolt: Zap, Star, Heart, Flag, Globe, Lock, Key,
+  Gear: Settings, Code, Palette, Book: BookOpen, Folder, Shield, Target, Trophy,
+  Music, Camera, Map, Clock, Calendar, Mail, Chat: MessageCircle, Search, Home,
+  Box: Package, Cloud, Database, Wrench, Hammer, Fire: Flame, Eye, Crown,
+  Diamond, Gift, Bell, Pin, Link, Tag,
 };
 
-const SHORTCODE_MAP: Record<string, string> = {
-  "female-detective": "🕵️‍♀️",
-  detective: "🕵️",
-  rocket: "🚀",
-  fire: "🔥",
-  star: "⭐",
-  sparkles: "✨",
-  bug: "🐛",
-  wrench: "🔧",
-  gear: "⚙️",
-  bulb: "💡",
-  zap: "⚡",
-  dart: "🎯",
-  trophy: "🏆",
-  hammer: "🔨",
-  microscope: "🔬",
-  robot: "🤖",
-  brain: "🧠",
-  eyes: "👀",
-  tada: "🎉",
-  boom: "💥",
-  rainbow: "🌈",
-  unicorn: "🦄",
+const SHORTCODE_MAP: Record<string, LucideIcon> = {
+  "female-detective": Search, detective: Search, rocket: Rocket, fire: Flame,
+  star: Star, sparkles: Sparkles, bug: Bug, wrench: Wrench, gear: Settings,
+  bulb: Lightbulb, zap: Zap, dart: Target, trophy: Trophy, hammer: Hammer,
+  microscope: Microscope, robot: Bot, brain: Brain, eyes: Eye, tada: PartyPopper,
+  boom: Zap, rainbow: Rainbow, unicorn: Star,
 };
 
-function resolveLinearIcon(icon: string | null | undefined): string | null {
+function resolveLinearIcon(icon: string | null | undefined): LucideIcon | null {
   if (!icon) return null;
   if (icon.startsWith(":") && icon.endsWith(":")) {
     const code = icon.slice(1, -1).toLowerCase();
@@ -264,6 +216,7 @@ function resolveLinearIcon(icon: string | null | undefined): string | null {
   }
   return LINEAR_ICON_MAP[icon] ?? null;
 }
+
 
 // ─── Source Identity Badge ─────────────────────────────────────────────────────
 
@@ -280,7 +233,7 @@ function SourceBadge({
   detail?: string;
   sourceType: "team" | "project";
 }) {
-  const resolvedIcon = resolveLinearIcon(icon);
+  const IconComponent = resolveLinearIcon(icon);
   const fallback = sourceType === "team" ? "T" : "P";
 
   return (
@@ -292,7 +245,7 @@ function SourceBadge({
           color: color ?? "var(--color-muted-foreground)",
         }}
       >
-        {resolvedIcon ?? fallback}
+        {IconComponent ? <IconComponent size={14} /> : fallback}
       </span>
       <div className="min-w-0">
         <span className="text-sm font-medium text-foreground truncate block">{name}</span>
