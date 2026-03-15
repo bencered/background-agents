@@ -8,7 +8,10 @@ vi.mock("@linear/sdk", () => {
     updateAgentSession: vi.fn().mockResolvedValue({ success: true }),
     updateIssue: vi.fn().mockResolvedValue({ success: true }),
     issueRepositorySuggestions: vi.fn().mockResolvedValue({ suggestions: [] }),
-    viewer: Promise.resolve({ id: "bot-user-123", organization: Promise.resolve({ id: "org-1", name: "Org" }) }),
+    viewer: Promise.resolve({
+      id: "bot-user-123",
+      organization: Promise.resolve({ id: "org-1", name: "Org" }),
+    }),
     team: vi.fn(),
     issue: vi.fn(),
   };
@@ -23,7 +26,9 @@ const { emitAgentActivity, getTeamStartedState, updateIssue, getAppUserId, getRe
   await import("./linear-client");
 
 // Get the mock client instance
-const { __mockClient: mockClient } = await import("@linear/sdk") as unknown as { __mockClient: ReturnType<typeof vi.fn> & Record<string, ReturnType<typeof vi.fn>> };
+const { __mockClient: mockClient } = (await import("@linear/sdk")) as unknown as {
+  __mockClient: ReturnType<typeof vi.fn> & Record<string, ReturnType<typeof vi.fn>>;
+};
 
 function makeClient(): LinearClient {
   return new LinearClient({ accessToken: "test" });

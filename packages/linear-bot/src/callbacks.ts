@@ -17,7 +17,11 @@ import { computeHmacHex } from "./utils/crypto";
 import { makePlan } from "./plan";
 import type { PlanStepStatus } from "./plan";
 import { createLogger } from "./logger";
-import { CompletionCallbackSchema, ToolCallCallbackSchema, ToolResultCallbackSchema } from "./schemas";
+import {
+  CompletionCallbackSchema,
+  ToolCallCallbackSchema,
+  ToolResultCallbackSchema,
+} from "./schemas";
 
 const log = createLogger("callback");
 
@@ -253,9 +257,11 @@ callbacksRouter.post("/tool_call", async (c) => {
           const todos = payload.args.todos as Array<{ content: string; status: string }>;
           const plan = todos.map((t) => ({
             content: t.content || "",
-            status: (t.status === "completed" ? "completed"
-              : t.status === "in_progress" ? "inProgress"
-              : "pending") as PlanStepStatus,
+            status: (t.status === "completed"
+              ? "completed"
+              : t.status === "in_progress"
+                ? "inProgress"
+                : "pending") as PlanStepStatus,
           }));
           if (plan.length > 0) {
             await updateAgentSession(client, context.agentSessionId, { plan });

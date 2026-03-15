@@ -3,6 +3,7 @@
 ## ⚠️ CRITICAL: READ THE LINEAR DOCS FIRST
 
 **Before making ANY changes to this package, read the Linear Agents API docs:**
+
 - https://linear.app/developers/agent-interaction
 - https://linear.app/developers/agent-signals
 - https://linear.app/developers/agent-best-practices
@@ -11,6 +12,7 @@
 **No exceptions. No guessing. No assumptions about webhook payload shapes.**
 
 ### Key Webhook Payload Rules (from docs)
+
 - `created` action → original comment in `agentSession.comment.body`, context in `promptContext`
 - `prompted` action → user's follow-up reply in `agentActivity.body` (NOT comment.body)
 - `previousComments` and `guidance` fields provide additional context

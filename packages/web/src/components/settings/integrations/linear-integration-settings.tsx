@@ -272,7 +272,8 @@ function RepoMappingSection({
         </div>
       ) : (
         <p className="text-sm text-muted-foreground mb-4">
-          No repository mappings yet. Add one to automatically route Linear issues to specific repos.
+          No repository mappings yet. Add one to automatically route Linear issues to specific
+          repos.
         </p>
       )}
 
@@ -365,10 +366,7 @@ function RepoMappingSection({
           </label>
 
           <div className="flex items-center gap-2 pt-1">
-            <Button
-              onClick={handleCreate}
-              disabled={saving || !newSourceId || !newRepo}
-            >
+            <Button onClick={handleCreate} disabled={saving || !newSourceId || !newRepo}>
               {saving ? "Adding..." : "Add Mapping"}
             </Button>
             <Button variant="outline" onClick={resetForm} disabled={saving}>
@@ -399,9 +397,7 @@ function RepoMappingRow({
   onSuccess: (msg: string) => void;
 }) {
   const [editing, setEditing] = useState(false);
-  const [editRepo, setEditRepo] = useState(
-    `${mapping.repo_owner}/${mapping.repo_name}`
-  );
+  const [editRepo, setEditRepo] = useState(`${mapping.repo_owner}/${mapping.repo_name}`);
   const [editLabelFilter, setEditLabelFilter] = useState(mapping.label_filter ?? "");
   const [editIsDefault, setEditIsDefault] = useState(mapping.is_default);
   const [saving, setSaving] = useState(false);

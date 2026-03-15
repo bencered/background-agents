@@ -128,7 +128,11 @@ export class RepoMappingStore {
     return rowToMapping(result);
   }
 
-  async update(integrationId: string, id: number, input: UpdateRepoMappingInput): Promise<RepoMapping | null> {
+  async update(
+    integrationId: string,
+    id: number,
+    input: UpdateRepoMappingInput
+  ): Promise<RepoMapping | null> {
     const existing = await this.getById(integrationId, id);
     if (!existing) return null;
 
@@ -151,7 +155,7 @@ export class RepoMappingStore {
         input.repo_owner ?? existing.repo_owner,
         input.repo_name ?? existing.repo_name,
         input.label_filter !== undefined ? (input.label_filter ?? null) : existing.label_filter,
-        input.is_default !== undefined ? (input.is_default ? 1 : 0) : (existing.is_default ? 1 : 0),
+        input.is_default !== undefined ? (input.is_default ? 1 : 0) : existing.is_default ? 1 : 0,
         now,
         integrationId,
         id
@@ -226,10 +230,7 @@ export class RepoMappingStore {
     // 2. Project mapping with no label filter
     if (projectId) {
       const match = mappings.find(
-        (m) =>
-          m.source_type === "project" &&
-          m.source_id === projectId &&
-          m.label_filter === null
+        (m) => m.source_type === "project" && m.source_id === projectId && m.label_filter === null
       );
       if (match) {
         return {

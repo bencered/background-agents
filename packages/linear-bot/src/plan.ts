@@ -15,13 +15,29 @@ export interface PlanStep {
 
 /** Ordered phases the agent typically goes through. */
 const PHASES = [
-  { id: "analyze", label: "Analyze issue & codebase", tools: ["Read", "read_file", "Glob", "Grep", "Bash:grep", "Bash:find", "Bash:ls", "Bash:cat"] },
-  { id: "implement", label: "Implement changes", tools: ["Edit", "edit_file", "Write", "write_file"] },
-  { id: "test", label: "Run tests", tools: ["Bash:npm test", "Bash:npx vitest", "Bash:pnpm test", "Bash:pytest", "Bash:jest"] },
-  { id: "pr", label: "Open pull request", tools: ["create-pull-request", "Bash:gh pr", "Bash:git push"] },
+  {
+    id: "analyze",
+    label: "Analyze issue & codebase",
+    tools: ["Read", "read_file", "Glob", "Grep", "Bash:grep", "Bash:find", "Bash:ls", "Bash:cat"],
+  },
+  {
+    id: "implement",
+    label: "Implement changes",
+    tools: ["Edit", "edit_file", "Write", "write_file"],
+  },
+  {
+    id: "test",
+    label: "Run tests",
+    tools: ["Bash:npm test", "Bash:npx vitest", "Bash:pnpm test", "Bash:pytest", "Bash:jest"],
+  },
+  {
+    id: "pr",
+    label: "Open pull request",
+    tools: ["create-pull-request", "Bash:gh pr", "Bash:git push"],
+  },
 ] as const;
 
-type PhaseId = typeof PHASES[number]["id"];
+type PhaseId = (typeof PHASES)[number]["id"];
 
 /** Tracks which phases have been entered. Stored in KV alongside session data. */
 export interface PlanProgress {
@@ -45,7 +61,10 @@ function matchPhase(tool: string, args: Record<string, unknown>): PhaseId | null
     for (const pattern of phase.tools) {
       if (pattern.startsWith("Bash:")) {
         const bashPattern = pattern.slice(5);
-        if ((tool === "Bash" || tool === "bash" || tool === "execute_command") && command.includes(bashPattern)) {
+        if (
+          (tool === "Bash" || tool === "bash" || tool === "execute_command") &&
+          command.includes(bashPattern)
+        ) {
           return phase.id;
         }
       } else if (tool === pattern || tool.toLowerCase() === pattern.toLowerCase()) {
@@ -57,7 +76,11 @@ function matchPhase(tool: string, args: Record<string, unknown>): PhaseId | null
 }
 
 /** Update progress based on a tool call. Returns true if progress changed. */
-export function updateProgress(progress: PlanProgress, tool: string, args: Record<string, unknown>): boolean {
+export function updateProgress(
+  progress: PlanProgress,
+  tool: string,
+  args: Record<string, unknown>
+): boolean {
   const phaseId = matchPhase(tool, args);
   if (!phaseId) return false;
 

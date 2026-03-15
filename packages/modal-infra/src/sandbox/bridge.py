@@ -35,7 +35,9 @@ configure_logging()
 
 # Fallback git identity when prompt author has no SCM name/email configured.
 # Matches the co-author trailer used in generateCommitMessage (shared/git.ts).
-FALLBACK_GIT_USER = GitUser(name="openinspect[bot]", email="262466261+openinspect[bot]@users.noreply.github.com")
+FALLBACK_GIT_USER = GitUser(
+    name="openinspect[bot]", email="262466261+openinspect[bot]@users.noreply.github.com"
+)
 
 
 class OpenCodeIdentifier:

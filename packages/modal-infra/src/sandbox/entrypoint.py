@@ -411,19 +411,28 @@ class SandboxSupervisor:
                 cp_url = os.environ.get("CONTROL_PLANE_URL", "")
                 cp_secret = os.environ.get("INTERNAL_CALLBACK_SECRET", "")
                 if cp_url and cp_secret:
-                    import hashlib, hmac as _hmac, time as _time
+                    import hashlib
+                    import hmac as _hmac
+                    import time as _time
+
                     ts = str(int(_time.time() * 1000))
                     sig = _hmac.new(cp_secret.encode(), ts.encode(), hashlib.sha256).hexdigest()
                     token = f"{ts}.{sig}"
-                    resp = httpx.get(f"{cp_url}/mcp-servers", headers={"Authorization": f"Bearer {token}"}, timeout=5.0)
+                    resp = httpx.get(
+                        f"{cp_url}/mcp-servers",
+                        headers={"Authorization": f"Bearer {token}"},
+                        timeout=5.0,
+                    )
                     if resp.status_code == 200:
                         all_servers = resp.json()
                         repo_full = f"{self.session_config.get('repo_owner', '')}/{self.session_config.get('repo_name', '')}".lower()
                         mcp_servers = [
-                            s for s in all_servers
-                            if s.get("enabled") and (
-                                not s.get("repoScopes") or
-                                repo_full in [r.lower() for r in (s.get("repoScopes") or [])]
+                            s
+                            for s in all_servers
+                            if s.get("enabled")
+                            and (
+                                not s.get("repoScopes")
+                                or repo_full in [r.lower() for r in (s.get("repoScopes") or [])]
                             )
                         ]
             except Exception:

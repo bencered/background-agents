@@ -52,7 +52,9 @@ vi.mock("../utils/integration-config", () => ({
 vi.mock("../model-resolution", () => ({
   resolveStaticRepo: vi.fn().mockReturnValue(null),
   extractModelFromLabels: vi.fn().mockReturnValue(null),
-  resolveSessionModelSettings: vi.fn().mockReturnValue({ model: "claude-sonnet-4-6", reasoningEffort: undefined }),
+  resolveSessionModelSettings: vi
+    .fn()
+    .mockReturnValue({ model: "claude-sonnet-4-6", reasoningEffort: undefined }),
 }));
 
 vi.mock("../plan", () => ({
@@ -176,7 +178,12 @@ describe("handleAgentSessionEvent — dispatcher routing", () => {
       await handleAgentSessionEvent(
         makeWebhook({
           action: "prompted",
-          agentActivity: { id: "act-1", agentSessionId: "agent-session-1", content: { type: "prompt", body: "stop" }, signal: "stop" },
+          agentActivity: {
+            id: "act-1",
+            agentSessionId: "agent-session-1",
+            content: { type: "prompt", body: "stop" },
+            signal: "stop",
+          },
         }),
         makeEnv(),
         "trace-1"
@@ -203,7 +210,12 @@ describe("handleAgentSessionEvent — dispatcher routing", () => {
       await handleAgentSessionEvent(
         makeWebhook({
           action: "prompted",
-          agentActivity: { id: "act-1", agentSessionId: "agent-session-1", content: { type: "prompt", body: "stop" }, signal: "stop" },
+          agentActivity: {
+            id: "act-1",
+            agentSessionId: "agent-session-1",
+            content: { type: "prompt", body: "stop" },
+            signal: "stop",
+          },
         }),
         makeEnv(),
         "trace-1"
@@ -264,7 +276,14 @@ describe("handleAgentSessionEvent — dispatcher routing", () => {
       mockControlPlaneFetch.mockResolvedValueOnce({ ok: true });
 
       await handleAgentSessionEvent(
-        makeWebhook({ action: "prompted", agentActivity: { id: "act-1", agentSessionId: "agent-session-1", content: { type: "prompt", body: "do more" } } }),
+        makeWebhook({
+          action: "prompted",
+          agentActivity: {
+            id: "act-1",
+            agentSessionId: "agent-session-1",
+            content: { type: "prompt", body: "do more" },
+          },
+        }),
         makeEnv(),
         "trace-1"
       );
@@ -315,7 +334,14 @@ describe("handleAgentSessionEvent — dispatcher routing", () => {
       mockControlPlaneFetch.mockResolvedValueOnce({ ok: true });
 
       await handleAgentSessionEvent(
-        makeWebhook({ action: "prompted", agentActivity: { id: "act-1", agentSessionId: "agent-session-1", content: { type: "prompt", body: "follow up" } } }),
+        makeWebhook({
+          action: "prompted",
+          agentActivity: {
+            id: "act-1",
+            agentSessionId: "agent-session-1",
+            content: { type: "prompt", body: "follow up" },
+          },
+        }),
         makeEnv(),
         "trace-1"
       );
@@ -339,7 +365,11 @@ describe("handleAgentSessionEvent — dispatcher routing", () => {
       await handleAgentSessionEvent(
         makeWebhook({
           action: "prompted",
-          agentActivity: { id: "act-1", agentSessionId: "agent-session-1", content: { type: "prompt", body: "org/repo-a" } },
+          agentActivity: {
+            id: "act-1",
+            agentSessionId: "agent-session-1",
+            content: { type: "prompt", body: "org/repo-a" },
+          },
         }),
         makeEnv(),
         "trace-1"
@@ -357,11 +387,7 @@ describe("handleAgentSessionEvent — dispatcher routing", () => {
       storeSession("issue-1");
       mockControlPlaneFetch.mockResolvedValueOnce({ ok: true });
 
-      await handleAgentSessionEvent(
-        makeWebhook({ action: "stopped" }),
-        makeEnv(),
-        "trace-1"
-      );
+      await handleAgentSessionEvent(makeWebhook({ action: "stopped" }), makeEnv(), "trace-1");
 
       expect(mockControlPlaneFetch).toHaveBeenCalledWith(
         expect.stringContaining("/sessions/session-abc/stop"),
@@ -373,11 +399,7 @@ describe("handleAgentSessionEvent — dispatcher routing", () => {
       storeSession("issue-1");
       mockControlPlaneFetch.mockResolvedValueOnce({ ok: true });
 
-      await handleAgentSessionEvent(
-        makeWebhook({ action: "cancelled" }),
-        makeEnv(),
-        "trace-1"
-      );
+      await handleAgentSessionEvent(makeWebhook({ action: "cancelled" }), makeEnv(), "trace-1");
 
       expect(mockControlPlaneFetch).toHaveBeenCalledWith(
         expect.stringContaining("/sessions/session-abc/stop"),
@@ -390,8 +412,26 @@ describe("handleAgentSessionEvent — dispatcher routing", () => {
     it("shows elicitation with all repos when multiple available", async () => {
       const { getAvailableRepos } = await import("../classifier/repos");
       (getAvailableRepos as ReturnType<typeof vi.fn>).mockResolvedValue([
-        { id: "carboncopyinc/habakkuk", owner: "CarbonCopyInc", name: "habakkuk", fullName: "CarbonCopyInc/habakkuk", displayName: "habakkuk", description: "Main app", defaultBranch: "main", private: true },
-        { id: "bencered/dom", owner: "bencered", name: "dom", fullName: "bencered/dom", displayName: "dom", description: "Coding agent", defaultBranch: "main", private: false },
+        {
+          id: "carboncopyinc/habakkuk",
+          owner: "CarbonCopyInc",
+          name: "habakkuk",
+          fullName: "CarbonCopyInc/habakkuk",
+          displayName: "habakkuk",
+          description: "Main app",
+          defaultBranch: "main",
+          private: true,
+        },
+        {
+          id: "bencered/dom",
+          owner: "bencered",
+          name: "dom",
+          fullName: "bencered/dom",
+          displayName: "dom",
+          description: "Coding agent",
+          defaultBranch: "main",
+          private: false,
+        },
       ]);
 
       // No session creation — should show elicitation
@@ -420,8 +460,26 @@ describe("handleAgentSessionEvent — dispatcher routing", () => {
     it("creates session on correct repo when user replies with repo name", async () => {
       const { getAvailableRepos } = await import("../classifier/repos");
       (getAvailableRepos as ReturnType<typeof vi.fn>).mockResolvedValue([
-        { id: "carboncopyinc/habakkuk", owner: "CarbonCopyInc", name: "habakkuk", fullName: "CarbonCopyInc/habakkuk", displayName: "habakkuk", description: "Main app", defaultBranch: "main", private: true },
-        { id: "bencered/dom", owner: "bencered", name: "dom", fullName: "bencered/dom", displayName: "dom", description: "Coding agent", defaultBranch: "main", private: false },
+        {
+          id: "carboncopyinc/habakkuk",
+          owner: "CarbonCopyInc",
+          name: "habakkuk",
+          fullName: "CarbonCopyInc/habakkuk",
+          displayName: "habakkuk",
+          description: "Main app",
+          defaultBranch: "main",
+          private: true,
+        },
+        {
+          id: "bencered/dom",
+          owner: "bencered",
+          name: "dom",
+          fullName: "bencered/dom",
+          displayName: "dom",
+          description: "Coding agent",
+          defaultBranch: "main",
+          private: false,
+        },
       ]);
 
       // Store pending classification (simulating first webhook already happened)
@@ -481,8 +539,26 @@ describe("handleAgentSessionEvent — dispatcher routing", () => {
     it("does NOT select bencered/dom when user types habakkuk", async () => {
       const { getAvailableRepos } = await import("../classifier/repos");
       (getAvailableRepos as ReturnType<typeof vi.fn>).mockResolvedValue([
-        { id: "carboncopyinc/habakkuk", owner: "CarbonCopyInc", name: "habakkuk", fullName: "CarbonCopyInc/habakkuk", displayName: "habakkuk", description: "Main app", defaultBranch: "main", private: true },
-        { id: "bencered/dom", owner: "bencered", name: "dom", fullName: "bencered/dom", displayName: "dom", description: "Coding agent", defaultBranch: "main", private: false },
+        {
+          id: "carboncopyinc/habakkuk",
+          owner: "CarbonCopyInc",
+          name: "habakkuk",
+          fullName: "CarbonCopyInc/habakkuk",
+          displayName: "habakkuk",
+          description: "Main app",
+          defaultBranch: "main",
+          private: true,
+        },
+        {
+          id: "bencered/dom",
+          owner: "bencered",
+          name: "dom",
+          fullName: "bencered/dom",
+          displayName: "dom",
+          description: "Coding agent",
+          defaultBranch: "main",
+          private: false,
+        },
       ]);
 
       storePending("issue-1");
@@ -520,7 +596,16 @@ describe("handleAgentSessionEvent — dispatcher routing", () => {
     it("auto-selects when only one repo available", async () => {
       const { getAvailableRepos } = await import("../classifier/repos");
       (getAvailableRepos as ReturnType<typeof vi.fn>).mockResolvedValue([
-        { id: "bencered/dom", owner: "bencered", name: "dom", fullName: "bencered/dom", displayName: "dom", description: "Coding agent", defaultBranch: "main", private: false },
+        {
+          id: "bencered/dom",
+          owner: "bencered",
+          name: "dom",
+          fullName: "bencered/dom",
+          displayName: "dom",
+          description: "Coding agent",
+          defaultBranch: "main",
+          private: false,
+        },
       ]);
 
       // Repo mapping resolve (returns no mapping)

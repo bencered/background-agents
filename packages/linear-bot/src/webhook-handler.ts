@@ -4,11 +4,7 @@
  */
 
 import type { AgentSessionEventWebhookPayload } from "@linear/sdk/webhooks";
-import type {
-  Env,
-  CallbackContext,
-  LinearIssueDetails,
-} from "./types";
+import type { Env, CallbackContext, LinearIssueDetails } from "./types";
 import {
   CreateSessionResponseSchema,
   GetSessionResponseSchema,
@@ -29,10 +25,7 @@ import { getAvailableRepos } from "./classifier/repos";
 import { getLinearConfig } from "./utils/integration-config";
 import { createLogger } from "./logger";
 import { makePlan } from "./plan";
-import {
-  extractModelFromLabels,
-  resolveSessionModelSettings,
-} from "./model-resolution";
+import { extractModelFromLabels, resolveSessionModelSettings } from "./model-resolution";
 import {
   getUserPreferences,
   lookupIssueSession,
@@ -144,7 +137,8 @@ async function handleFollowUp(
   const existingSession = await lookupIssueSession(env, issue.id);
   if (!existingSession) return;
 
-  const followUpContent = agentActivity?.content?.body || comment?.body || "Follow-up on the issue.";
+  const followUpContent =
+    agentActivity?.content?.body || comment?.body || "Follow-up on the issue.";
 
   await emitAgentActivity(
     client,
@@ -165,7 +159,9 @@ async function handleFollowUp(
     );
     if (eventsRes.ok) {
       const eventsData = SessionEventsResponseSchema.parse(await eventsRes.json());
-      const recentTokens = eventsData.events.filter((e: { type: string }) => e.type === "token").slice(-1);
+      const recentTokens = eventsData.events
+        .filter((e: { type: string }) => e.type === "token")
+        .slice(-1);
       if (recentTokens.length > 0) {
         const lastContent = String(recentTokens[0].data.content ?? "");
         if (lastContent) {
@@ -235,11 +231,7 @@ async function handleClassificationReply(
   // Extract repo name from user's reply
   // Per Linear docs: prompted action → reply in agentActivity.content.body
   const activityBody = getActivityBody(webhook);
-  const replyText = (
-    activityBody ||
-    webhook.agentSession.comment?.body ||
-    ""
-  ).trim();
+  const replyText = (activityBody || webhook.agentSession.comment?.body || "").trim();
 
   if (!replyText) {
     await emitAgentActivity(client, agentSessionId, {
@@ -253,9 +245,7 @@ async function handleClassificationReply(
   const repos = await getAvailableRepos(env, traceId);
   const normalizedReply = replyText.toLowerCase().replace(/[`*]/g, "").trim();
 
-  let matchedRepo = repos.find(
-    (r) => `${r.owner}/${r.name}`.toLowerCase() === normalizedReply
-  );
+  let matchedRepo = repos.find((r) => `${r.owner}/${r.name}`.toLowerCase() === normalizedReply);
   if (!matchedRepo) {
     matchedRepo = repos.find((r) => r.name.toLowerCase() === normalizedReply);
   }
@@ -359,7 +349,11 @@ async function handleClassificationReply(
 
   if (!sessionRes.ok) {
     let errBody = "";
-    try { errBody = await sessionRes.text(); } catch { /* ignore */ }
+    try {
+      errBody = await sessionRes.text();
+    } catch {
+      /* ignore */
+    }
     await emitAgentActivity(client, agentSessionId, {
       type: "error",
       body: `Failed to create a coding session.\n\n\`HTTP ${sessionRes.status}: ${errBody.slice(0, 200)}\``,
@@ -385,7 +379,8 @@ async function handleClassificationReply(
   });
 
   // Build and send prompt
-  const prompt = webhook.promptContext || buildPrompt(issue, issueDetails, webhook.agentSession.comment);
+  const prompt =
+    webhook.promptContext || buildPrompt(issue, issueDetails, webhook.agentSession.comment);
   const callbackContext: CallbackContext = {
     source: "linear",
     issueId: issue.id,
@@ -414,7 +409,11 @@ async function handleClassificationReply(
 
   if (!promptRes.ok) {
     let errBody = "";
-    try { errBody = await promptRes.text(); } catch { /* ignore */ }
+    try {
+      errBody = await promptRes.text();
+    } catch {
+      /* ignore */
+    }
     await emitAgentActivity(client, agentSessionId, {
       type: "error",
       body: `Failed to send prompt.\n\n\`HTTP ${promptRes.status}: ${errBody.slice(0, 200)}\``,
@@ -487,18 +486,21 @@ async function handleNewSession(
   //    user's reply is a repo name. This handles both fresh pending state
   //    AND cases where pending state was lost (e.g. pre-fix invocations).
   if (webhook.action === "prompted") {
-    const replyText = (
-      getActivityBody(webhook) ||
-      webhook.agentSession.comment?.body ||
-      ""
-    ).trim().toLowerCase().replace(/[`*]/g, "");
+    const replyText = (getActivityBody(webhook) || webhook.agentSession.comment?.body || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[`*]/g, "");
 
     if (replyText) {
       const repos = await getAvailableRepos(env, traceId);
       const matched =
         repos.find((r) => `${r.owner}/${r.name}`.toLowerCase() === replyText) ||
         repos.find((r) => r.name.toLowerCase() === replyText) ||
-        repos.find((r) => replyText.includes(r.name.toLowerCase()) || replyText.includes(`${r.owner}/${r.name}`.toLowerCase()));
+        repos.find(
+          (r) =>
+            replyText.includes(r.name.toLowerCase()) ||
+            replyText.includes(`${r.owner}/${r.name}`.toLowerCase())
+        );
 
       if (matched) {
         repoOwner = matched.owner;
@@ -551,15 +553,12 @@ async function handleNewSession(
     const fallbackRepos = await getAvailableRepos(env, traceId);
     const repoOptions = fallbackRepos.map((r) => `${r.owner}/${r.name}`);
 
-    const elicitationBody = repoOptions.length > 0
-      ? `I couldn't automatically determine which repository to work on.\n\n**Available repositories:**\n${repoOptions.map((r) => `- **${r}**`).join("\n")}\n\nPlease reply with the repository name.`
-      : "No repositories are configured. Please add a repository first.";
+    const elicitationBody =
+      repoOptions.length > 0
+        ? `I couldn't automatically determine which repository to work on.\n\n**Available repositories:**\n${repoOptions.map((r) => `- **${r}**`).join("\n")}\n\nPlease reply with the repository name.`
+        : "No repositories are configured. Please add a repository first.";
 
-    await emitAgentActivity(
-      client,
-      agentSessionId,
-      { type: "response", body: elicitationBody }
-    );
+    await emitAgentActivity(client, agentSessionId, { type: "response", body: elicitationBody });
 
     // Store pending state so follow-up reply can complete resolution
     await storePendingClassification(env, issue.id, {
@@ -592,9 +591,10 @@ async function handleNewSession(
       agentSessionId,
       {
         type: "elicitation",
-        body: fallbackOptions.length > 0
-          ? `I couldn't determine which repository to work on.\n\n**Available repositories:**\n${fallbackOptions.map((r) => `- **${r}**`).join("\n")}\n\nPlease select a repository.`
-          : "I couldn't determine which repository to work on. Please configure a project→repo or team→repo mapping and try again.",
+        body:
+          fallbackOptions.length > 0
+            ? `I couldn't determine which repository to work on.\n\n**Available repositories:**\n${fallbackOptions.map((r) => `- **${r}**`).join("\n")}\n\nPlease select a repository.`
+            : "I couldn't determine which repository to work on. Please configure a project→repo or team→repo mapping and try again.",
       },
       false,
       fallbackOptions.length > 0 ? "select" : undefined,
@@ -856,11 +856,13 @@ export async function handleAgentSessionEvent(
     if (stopSession) {
       const headers = await getAuthHeaders(env, traceId);
       try {
-        await env.CONTROL_PLANE.fetch(
-          `https://internal/sessions/${stopSession.sessionId}/stop`,
-          { method: "POST", headers }
-        );
-      } catch { /* best effort */ }
+        await env.CONTROL_PLANE.fetch(`https://internal/sessions/${stopSession.sessionId}/stop`, {
+          method: "POST",
+          headers,
+        });
+      } catch {
+        /* best effort */
+      }
       await env.LINEAR_KV.delete(`issue:${issue.id}`);
     }
     const client = await getLinearClient(env, webhook.organizationId);
@@ -901,7 +903,12 @@ export async function handleAgentSessionEvent(
       );
       if (statusRes.ok) {
         const sessionData = GetSessionResponseSchema.parse(await statusRes.json());
-        const terminalStatuses: Set<SessionStatus> = new Set(["completed", "archived", "cancelled", "failed"]);
+        const terminalStatuses: Set<SessionStatus> = new Set([
+          "completed",
+          "archived",
+          "cancelled",
+          "failed",
+        ]);
         isAlive = !terminalStatuses.has(sessionData.status);
       }
     } catch {

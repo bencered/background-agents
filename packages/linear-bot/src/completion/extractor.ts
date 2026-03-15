@@ -3,18 +3,19 @@
  * Ported from slack-bot/src/completion/extractor.ts.
  */
 
-import type {
-  Env,
-  AgentResponse,
-  ToolCallSummary,
-  ArtifactInfo,
-} from "../types";
+import type { Env, AgentResponse, ToolCallSummary, ArtifactInfo } from "../types";
 import type { ArtifactType } from "@open-inspect/shared";
 import { generateInternalToken } from "../utils/internal";
 import { createLogger } from "../logger";
 import { ListEventsResponseSchema, ListArtifactsResponseSchema } from "../schemas";
 
-interface EventResponse { id: string; type: string; createdAt: string | number; data: Record<string, unknown>; messageId?: string }
+interface EventResponse {
+  id: string;
+  type: string;
+  createdAt: string | number;
+  data: Record<string, unknown>;
+  messageId?: string;
+}
 
 const log = createLogger("extractor");
 
@@ -146,7 +147,10 @@ async function fetchSessionArtifacts(
 
 function summarizeToolCall(data: Record<string, unknown>): ToolCallSummary {
   const tool = String(data.tool ?? "Unknown");
-  const args = (data.args && typeof data.args === "object" ? data.args : {}) as Record<string, unknown>;
+  const args = (data.args && typeof data.args === "object" ? data.args : {}) as Record<
+    string,
+    unknown
+  >;
   switch (tool) {
     case "Read":
       return { tool, summary: `Read ${args.file_path ?? "file"}` };

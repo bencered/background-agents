@@ -155,7 +155,9 @@ export async function emitAgentActivity(
     const input: Record<string, unknown> = { agentSessionId, content, ephemeral };
     if (signal) input.signal = signal;
     if (signalMetadata) input.signalMetadata = signalMetadata;
-    await (client.createAgentActivity as (input: Record<string, unknown>) => Promise<unknown>)(input);
+    await (client.createAgentActivity as (input: Record<string, unknown>) => Promise<unknown>)(
+      input
+    );
   } catch (err) {
     log.error("linear.emit_activity_failed", {
       agent_session_id: agentSessionId,
@@ -300,7 +302,11 @@ export async function getRepoSuggestions(
   candidateRepos: Array<{ hostname: string; repositoryFullName: string }>
 ): Promise<Array<{ repositoryFullName: string; confidence: number }>> {
   try {
-    const result = await (client as any).issueRepositorySuggestions(issueId, agentSessionId, candidateRepos);
+    const result = await (client as any).issueRepositorySuggestions(
+      issueId,
+      agentSessionId,
+      candidateRepos
+    );
     return result.suggestions.map((s: any) => ({
       repositoryFullName: s.repositoryFullName,
       confidence: s.confidence,
@@ -350,6 +356,6 @@ export async function postIssueComment(
   });
 
   if (!response.ok) return { success: false };
-  const data = await response.json() as { data?: { commentCreate?: { success: boolean } } }; // intentional cast — fallback path
+  const data = (await response.json()) as { data?: { commentCreate?: { success: boolean } } }; // intentional cast — fallback path
   return { success: data?.data?.commentCreate?.success ?? false };
 }

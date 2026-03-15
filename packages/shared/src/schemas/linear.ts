@@ -18,11 +18,13 @@ const WebhookAgentActivitySchema = z.object({
   signal: z.string().nullable().optional(),
   signalMetadata: z.record(z.string(), z.unknown()).nullable().optional(),
   userId: z.string().nullable().optional(),
-  user: z.object({
-    id: z.string(),
-    name: z.string(),
-    email: z.string().optional(),
-  }).optional(),
+  user: z
+    .object({
+      id: z.string(),
+      name: z.string(),
+      email: z.string().optional(),
+    })
+    .optional(),
 });
 
 const WebhookCommentSchema = z.object({
@@ -39,11 +41,13 @@ const WebhookIssueSchema = z.object({
   url: z.string(),
   description: z.string().nullable().optional(),
   teamId: z.string().optional(),
-  team: z.object({
-    id: z.string(),
-    key: z.string(),
-    name: z.string(),
-  }).optional(),
+  team: z
+    .object({
+      id: z.string(),
+      key: z.string(),
+      name: z.string(),
+    })
+    .optional(),
 });
 
 const WebhookAgentSessionSchema = z.object({
@@ -53,11 +57,13 @@ const WebhookAgentSessionSchema = z.object({
   issueId: z.string(),
   comment: WebhookCommentSchema.nullable().optional(),
   issue: WebhookIssueSchema,
-  creator: z.object({
-    id: z.string(),
-    name: z.string(),
-    email: z.string().optional(),
-  }).optional(),
+  creator: z
+    .object({
+      id: z.string(),
+      name: z.string(),
+      email: z.string().optional(),
+    })
+    .optional(),
 });
 
 export const AgentSessionWebhookSchema = z.object({
@@ -113,91 +119,123 @@ const WorkflowStateNodeSchema = z.object({
 });
 
 export const TeamStartedStatesResponseSchema = z.object({
-  data: z.object({
-    team: z.object({
-      states: z.object({
-        nodes: z.array(WorkflowStateNodeSchema),
-      }),
-    }).nullable().optional(),
-  }).optional(),
+  data: z
+    .object({
+      team: z
+        .object({
+          states: z.object({
+            nodes: z.array(WorkflowStateNodeSchema),
+          }),
+        })
+        .nullable()
+        .optional(),
+    })
+    .optional(),
 });
 
 // ─── Issue Update ────────────────────────────────────────────────────────────
 
 export const IssueUpdateResponseSchema = z.object({
-  data: z.object({
-    issueUpdate: z.object({
-      success: z.boolean(),
-    }).optional(),
-  }).optional(),
+  data: z
+    .object({
+      issueUpdate: z
+        .object({
+          success: z.boolean(),
+        })
+        .optional(),
+    })
+    .optional(),
 });
 
 // ─── Viewer ──────────────────────────────────────────────────────────────────
 
 export const ViewerResponseSchema = z.object({
-  data: z.object({
-    viewer: z.object({
-      id: z.string(),
-    }).optional(),
-  }).optional(),
+  data: z
+    .object({
+      viewer: z
+        .object({
+          id: z.string(),
+        })
+        .optional(),
+    })
+    .optional(),
 });
 
 // ─── Issue Details ───────────────────────────────────────────────────────────
 
 export const IssueDetailsResponseSchema = z.object({
-  data: z.object({
-    issue: z.object({
-      id: z.string(),
-      identifier: z.string(),
-      title: z.string(),
-      description: z.string().nullable().optional(),
-      url: z.string(),
-      priority: z.number(),
-      priorityLabel: z.string(),
-      labels: z.object({ nodes: z.array(LinearLabelSchema) }),
-      project: LinearProjectSchema.nullable(),
-      assignee: LinearAssigneeSchema.nullable(),
-      team: LinearTeamSchema,
-      comments: z.object({ nodes: z.array(LinearCommentSchema) }),
-    }).nullable().optional(),
-  }).optional(),
+  data: z
+    .object({
+      issue: z
+        .object({
+          id: z.string(),
+          identifier: z.string(),
+          title: z.string(),
+          description: z.string().nullable().optional(),
+          url: z.string(),
+          priority: z.number(),
+          priorityLabel: z.string(),
+          labels: z.object({ nodes: z.array(LinearLabelSchema) }),
+          project: LinearProjectSchema.nullable(),
+          assignee: LinearAssigneeSchema.nullable(),
+          team: LinearTeamSchema,
+          comments: z.object({ nodes: z.array(LinearCommentSchema) }),
+        })
+        .nullable()
+        .optional(),
+    })
+    .optional(),
 });
 
 // ─── Repo Suggestions ────────────────────────────────────────────────────────
 
 export const RepoSuggestionsResponseSchema = z.object({
-  data: z.object({
-    issueRepositorySuggestions: z.object({
-      suggestions: z.array(
-        z.object({
-          hostname: z.string().optional(),
-          repositoryFullName: z.string(),
-          confidence: z.number(),
+  data: z
+    .object({
+      issueRepositorySuggestions: z
+        .object({
+          suggestions: z.array(
+            z.object({
+              hostname: z.string().optional(),
+              repositoryFullName: z.string(),
+              confidence: z.number(),
+            })
+          ),
         })
-      ),
-    }).optional(),
-  }).optional(),
+        .optional(),
+    })
+    .optional(),
 });
 
 // ─── Comment Create ──────────────────────────────────────────────────────────
 
 export const CommentCreateResponseSchema = z.object({
-  data: z.object({
-    commentCreate: z.object({
-      success: z.boolean(),
-    }).optional(),
-  }).optional(),
+  data: z
+    .object({
+      commentCreate: z
+        .object({
+          success: z.boolean(),
+        })
+        .optional(),
+    })
+    .optional(),
 });
 
 // ─── Workspace Info ──────────────────────────────────────────────────────────
 
 export const WorkspaceInfoResponseSchema = z.object({
-  data: z.object({
-    viewer: z.object({
-      organization: z.object({
-        id: z.string(),
-        name: z.string(),
-      }).optional(),
-    }).optional(),
-  }).optional(),
+  data: z
+    .object({
+      viewer: z
+        .object({
+          organization: z
+            .object({
+              id: z.string(),
+              name: z.string(),
+            })
+            .optional(),
+        })
+        .optional(),
+    })
+    .optional(),
 });

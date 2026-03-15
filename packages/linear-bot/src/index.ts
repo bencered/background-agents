@@ -9,10 +9,7 @@ import { Hono } from "hono";
 import type { Env, UserPreferences } from "./types";
 import { LinearWebhookClient, LINEAR_WEBHOOK_SIGNATURE_HEADER } from "@linear/sdk/webhooks";
 import type { AgentSessionEventWebhookPayload } from "@linear/sdk/webhooks";
-import {
-  buildOAuthAuthorizeUrl,
-  exchangeCodeForToken,
-} from "./utils/linear-client";
+import { buildOAuthAuthorizeUrl, exchangeCodeForToken } from "./utils/linear-client";
 import { callbacksRouter } from "./callbacks";
 import { createLogger } from "./logger";
 import { verifyInternalToken } from "@open-inspect/shared";
