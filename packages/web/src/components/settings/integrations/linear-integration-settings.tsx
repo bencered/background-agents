@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { createElement, useEffect, useState, type ReactNode } from "react";
 import useSWR, { mutate } from "swr";
 import { toast } from "sonner";
 import {
@@ -200,21 +200,26 @@ const LINEAR_ICON_MAP: Record<string, LucideIcon> = {
   Diamond, Gift, Bell, Pin, Link, Tag,
 };
 
-const SHORTCODE_MAP: Record<string, LucideIcon> = {
-  "female-detective": Search, detective: Search, rocket: Rocket, fire: Flame,
-  star: Star, sparkles: Sparkles, bug: Bug, wrench: Wrench, gear: Settings,
-  bulb: Lightbulb, zap: Zap, dart: Target, trophy: Trophy, hammer: Hammer,
-  microscope: Microscope, robot: Bot, brain: Brain, eyes: Eye, tada: PartyPopper,
-  boom: Zap, rainbow: Rainbow, unicorn: Star,
+const SHORTCODE_MAP: Record<string, string> = {
+  "female-detective": "🕵️‍♀️", detective: "🕵️",
+  rocket: "🚀", fire: "🔥", star: "⭐", sparkles: "✨",
+  bug: "🐛", wrench: "🔧", gear: "⚙️", bulb: "💡",
+  zap: "⚡", dart: "🎯", trophy: "🏆", hammer: "🔨",
+  microscope: "🔬", robot: "🤖", brain: "🧠", eyes: "👀",
+  tada: "🎉", boom: "💥", rainbow: "🌈", unicorn: "🦄",
 };
 
-function resolveLinearIcon(icon: string | null | undefined): LucideIcon | null {
+function resolveLinearIcon(icon: string | null | undefined): LucideIcon | string | null {
   if (!icon) return null;
+  // Shortcodes like :female-detective: → emoji string
   if (icon.startsWith(":") && icon.endsWith(":")) {
     const code = icon.slice(1, -1).toLowerCase();
     return SHORTCODE_MAP[code] ?? null;
   }
-  return LINEAR_ICON_MAP[icon] ?? null;
+  // PascalCase icon names → Lucide component
+  if (LINEAR_ICON_MAP[icon]) return LINEAR_ICON_MAP[icon];
+  // Already an emoji or unknown string — pass through as-is
+  return icon;
 }
 
 
@@ -233,7 +238,7 @@ function SourceBadge({
   detail?: string;
   sourceType: "team" | "project";
 }) {
-  const IconComponent = resolveLinearIcon(icon);
+  const resolved = resolveLinearIcon(icon);
   const fallback = sourceType === "team" ? "T" : "P";
 
   return (
@@ -245,7 +250,7 @@ function SourceBadge({
           color: color ?? "var(--color-muted-foreground)",
         }}
       >
-        {IconComponent ? <IconComponent size={14} /> : fallback}
+        {resolved ? (typeof resolved === "string" ? resolved : createElement(resolved, { size: 14 })) : fallback}
       </span>
       <div className="min-w-0">
         <span className="text-sm font-medium text-foreground truncate block">{name}</span>
