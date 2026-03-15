@@ -250,10 +250,10 @@ function ScrollFade({ children, borderClass, scrollClass }: { children: ReactNod
   const maskImage = atTop && atBottom
     ? undefined
     : atTop
-      ? "linear-gradient(to bottom, black calc(100% - 24px), transparent 100%)"
+      ? "linear-gradient(to bottom, black calc(100% - 48px), transparent 100%)"
       : atBottom
-        ? "linear-gradient(to top, black calc(100% - 24px), transparent 100%)"
-        : "linear-gradient(to bottom, transparent 0%, black 24px, black calc(100% - 24px), transparent 100%)";
+        ? "linear-gradient(to top, black calc(100% - 48px), transparent 100%)"
+        : "linear-gradient(to bottom, transparent 0%, black 48px, black calc(100% - 48px), transparent 100%)";
 
   return (
     <div className={borderClass}>
