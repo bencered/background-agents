@@ -240,7 +240,6 @@ function ScrollFade({ children, className }: { children: ReactNode; className?: 
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    // Check on mount + whenever children change size
     checkScroll();
     const ro = new ResizeObserver(checkScroll);
     ro.observe(el);
@@ -248,7 +247,6 @@ function ScrollFade({ children, className }: { children: ReactNode; className?: 
     return () => { ro.disconnect(); el.removeEventListener("scroll", checkScroll); };
   }, [checkScroll]);
 
-  // Use CSS mask so the container border stays visible
   const maskImage = atTop && atBottom
     ? undefined
     : atTop
@@ -258,12 +256,14 @@ function ScrollFade({ children, className }: { children: ReactNode; className?: 
         : "linear-gradient(to bottom, transparent 0%, black 24px, black calc(100% - 24px), transparent 100%)";
 
   return (
-    <div
-      ref={ref}
-      className={`overflow-y-auto ${className ?? ""}`}
-      style={maskImage ? { maskImage, WebkitMaskImage: maskImage } : undefined}
-    >
-      {children}
+    <div className={className}>
+      <div
+        ref={ref}
+        className="overflow-y-auto h-full"
+        style={maskImage ? { maskImage, WebkitMaskImage: maskImage } : undefined}
+      >
+        {children}
+      </div>
     </div>
   );
 }
