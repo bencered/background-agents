@@ -305,6 +305,22 @@ function SourceBadge({
   );
 }
 
+
+function SourceIcon({ icon, color, fallback }: { icon?: string | null; color?: string | null; fallback: string }) {
+  const resolved = resolveLinearIcon(icon);
+  return (
+    <span
+      className="inline-flex items-center justify-center w-5 h-5 rounded text-xs shrink-0"
+      style={{
+        backgroundColor: color ? `${color}18` : "var(--color-muted)",
+        color: color ?? "var(--color-muted-foreground)",
+      }}
+    >
+      {resolved ? (typeof resolved === "string" ? resolved : createElement(resolved, { size: 11 })) : fallback}
+    </span>
+  );
+}
+
 function RepoMappingSection({
   mappings,
   availableRepos,
@@ -423,7 +439,10 @@ function RepoMappingSection({
                     <SelectLabel>Teams</SelectLabel>
                     {linearTeams.map((t) => (
                       <SelectItem key={t.id} value={`team:${t.id}`}>
-                        {t.name}
+                        <span className="flex items-center gap-2">
+                          <SourceIcon icon={t.icon} color={t.color} fallback="T" />
+                          {t.name}
+                        </span>
                       </SelectItem>
                     ))}
                   </SelectGroup>
@@ -433,7 +452,10 @@ function RepoMappingSection({
                     <SelectLabel>Projects</SelectLabel>
                     {linearProjects.map((p) => (
                       <SelectItem key={p.id} value={`project:${p.id}`}>
-                        {p.name}
+                        <span className="flex items-center gap-2">
+                          <SourceIcon icon={p.icon} color={p.color} fallback="P" />
+                          {p.name}
+                        </span>
                       </SelectItem>
                     ))}
                   </SelectGroup>
