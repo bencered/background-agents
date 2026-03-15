@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { RadioCard } from "@/components/ui/form-controls";
+import { PlusIcon, PencilIcon, TrashIcon } from "@/components/ui/icons";
 import {
   Select,
   SelectContent,
@@ -57,11 +58,15 @@ interface LinearTeam {
   id: string;
   name: string;
   key: string;
+  color?: string | null;
+  icon?: string | null;
 }
 
 interface LinearProject {
   id: string;
   name: string;
+  color?: string | null;
+  icon?: string | null;
 }
 
 const GLOBAL_SETTINGS_KEY = "/api/integration-settings/linear";
@@ -175,6 +180,40 @@ export function LinearIntegrationSettings() {
   );
 }
 
+// ─── Source Identity Badge ─────────────────────────────────────────────────────
+
+function SourceBadge({
+  icon,
+  color,
+  name,
+  detail,
+  sourceType,
+}: {
+  icon?: string | null;
+  color?: string | null;
+  name: string;
+  detail?: string;
+  sourceType: "team" | "project";
+}) {
+  return (
+    <div className="flex items-center gap-2 min-w-0">
+      <span
+        className="flex items-center justify-center w-7 h-7 rounded-md text-sm shrink-0"
+        style={{
+          backgroundColor: color ? `${color}18` : "var(--color-muted)",
+          color: color ?? "var(--color-muted-foreground)",
+        }}
+      >
+        {icon ?? (sourceType === "team" ? "T" : "P")}
+      </span>
+      <div className="min-w-0">
+        <span className="text-sm font-medium text-foreground truncate block">{name}</span>
+        {detail && <span className="text-xs text-muted-foreground truncate block">{detail}</span>}
+      </div>
+    </div>
+  );
+}
+
 function RepoMappingSection({
   mappings,
   availableRepos,
@@ -187,8 +226,7 @@ function RepoMappingSection({
   linearProjects: LinearProject[];
 }) {
   const [adding, setAdding] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [step, setStep] = useState<1 | 2>(1);
 
   // New mapping form state
   const [newSourceType, setNewSourceType] = useState<"team" | "project">("team");
@@ -208,6 +246,7 @@ function RepoMappingSection({
     setNewLabelFilter("");
     setNewIsDefault(false);
     setAdding(false);
+    setStep(1);
   };
 
   const handleCreate = async () => {
@@ -216,9 +255,6 @@ function RepoMappingSection({
     if (!repoOwner || !repoName) return;
 
     setSaving(true);
-    setError("");
-    setSuccess("");
-
     const sourceName = selectedSource?.name ?? newSourceId;
 
     try {
@@ -239,23 +275,22 @@ function RepoMappingSection({
       if (res.ok) {
         await mutate(REPO_MAPPINGS_KEY);
         resetForm();
-        setSuccess("Mapping added.");
+        toast.success("Mapping added.");
       } else {
         const data = await res.json();
-        setError((data as { error?: string }).error ?? "Failed to add mapping");
+        toast.error((data as { error?: string }).error ?? "Failed to add mapping");
       }
     } catch {
-      setError("Failed to add mapping");
+      toast.error("Failed to add mapping");
     } finally {
       setSaving(false);
     }
   };
 
+  const noSources = linearTeams.length === 0 && linearProjects.length === 0;
+
   return (
     <div>
-      {error && <Message tone="error" text={error} />}
-      {success && <Message tone="success" text={success} />}
-
       {mappings.length > 0 ? (
         <div className="space-y-2 mb-4">
           {mappings.map((m) => (
@@ -265,117 +300,183 @@ function RepoMappingSection({
               availableRepos={availableRepos}
               linearTeams={linearTeams}
               linearProjects={linearProjects}
-              onError={setError}
-              onSuccess={setSuccess}
             />
           ))}
         </div>
       ) : (
-        <p className="text-sm text-muted-foreground mb-4">
-          No repository mappings yet. Add one to automatically route Linear issues to specific
-          repos.
-        </p>
+        <div className="text-center py-8 mb-4 border border-dashed border-border rounded-md">
+          <p className="text-sm text-muted-foreground mb-1">No mappings configured</p>
+          <p className="text-xs text-muted-foreground">
+            {noSources
+              ? "Authorize Linear first to map teams and projects to repositories."
+              : "Map Linear teams or projects to GitHub repos for automatic routing."}
+          </p>
+        </div>
       )}
 
       {adding ? (
-        <div className="border border-border rounded-sm p-4 space-y-3">
-          <p className="text-sm font-medium text-foreground">Add Repository Mapping</p>
+        <div className="border border-border rounded-md p-4 space-y-4">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span className={step === 1 ? "text-foreground font-medium" : ""}>1. Source</span>
+            <span>→</span>
+            <span className={step === 2 ? "text-foreground font-medium" : ""}>2. Target</span>
+          </div>
 
-          <div className="grid sm:grid-cols-2 gap-3">
-            <label className="text-sm">
-              <span className="block text-foreground font-medium mb-1">Source type</span>
-              <Select
-                value={newSourceType}
-                onValueChange={(v) => {
-                  setNewSourceType(v as "team" | "project");
-                  setNewSourceId("");
-                }}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="team">Team</SelectItem>
-                  <SelectItem value="project">Project</SelectItem>
-                </SelectContent>
-              </Select>
-            </label>
+          {step === 1 && (
+            <div className="space-y-3">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    setNewSourceType("team");
+                    setNewSourceId("");
+                  }}
+                  className={`flex-1 px-3 py-2 text-sm rounded-md border transition ${
+                    newSourceType === "team"
+                      ? "border-foreground/30 bg-muted text-foreground font-medium"
+                      : "border-border text-muted-foreground hover:border-foreground/20"
+                  }`}
+                >
+                  Teams
+                </button>
+                <button
+                  onClick={() => {
+                    setNewSourceType("project");
+                    setNewSourceId("");
+                  }}
+                  className={`flex-1 px-3 py-2 text-sm rounded-md border transition ${
+                    newSourceType === "project"
+                      ? "border-foreground/30 bg-muted text-foreground font-medium"
+                      : "border-border text-muted-foreground hover:border-foreground/20"
+                  }`}
+                >
+                  Projects
+                </button>
+              </div>
 
-            <label className="text-sm">
-              <span className="block text-foreground font-medium mb-1">
-                {newSourceType === "team" ? "Team" : "Project"}
-              </span>
-              <Select value={newSourceId} onValueChange={setNewSourceId}>
-                <SelectTrigger className="w-full">
-                  <SelectValue
-                    placeholder={
-                      sourceOptions.length === 0
-                        ? newSourceType === "team"
-                          ? "No teams found (OAuth required)"
-                          : "No projects found (OAuth required)"
-                        : `Select a ${newSourceType}...`
-                    }
+              {sourceOptions.length === 0 ? (
+                <p className="text-sm text-muted-foreground px-3 py-6 text-center border border-dashed border-border rounded-md">
+                  No {newSourceType === "team" ? "teams" : "projects"} found.{" "}
+                  <a
+                    href="/api/linear/oauth/authorize"
+                    className="text-foreground underline underline-offset-2"
+                  >
+                    Authorize Linear
+                  </a>{" "}
+                  to load them.
+                </p>
+              ) : (
+                <div className="max-h-48 overflow-y-auto border border-border rounded-md divide-y divide-border">
+                  {sourceOptions.map((s) => {
+                    const team = s as LinearTeam;
+                    return (
+                      <button
+                        key={s.id}
+                        onClick={() => {
+                          setNewSourceId(s.id);
+                          setStep(2);
+                        }}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition hover:bg-muted/50 ${
+                          newSourceId === s.id ? "bg-muted" : ""
+                        }`}
+                      >
+                        <SourceBadge
+                          icon={s.icon}
+                          color={s.color}
+                          name={s.name}
+                          detail={team.key ? team.key : undefined}
+                          sourceType={newSourceType}
+                        />
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div className="flex justify-end">
+                <Button variant="outline" size="sm" onClick={resetForm}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {step === 2 && selectedSource && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-md">
+                <SourceBadge
+                  icon={selectedSource.icon}
+                  color={selectedSource.color}
+                  name={selectedSource.name}
+                  detail={(selectedSource as LinearTeam).key}
+                  sourceType={newSourceType}
+                />
+                <button
+                  onClick={() => setStep(1)}
+                  className="ml-auto text-xs text-muted-foreground hover:text-foreground"
+                >
+                  Change
+                </button>
+              </div>
+
+              <label className="text-sm">
+                <span className="block text-foreground font-medium mb-1">Repository</span>
+                <Select value={newRepo} onValueChange={setNewRepo}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select a repository..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableRepos.map((r) => (
+                      <SelectItem key={r.fullName} value={r.fullName.toLowerCase()}>
+                        {r.fullName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </label>
+
+              <div className="grid sm:grid-cols-2 gap-3">
+                <label className="text-sm">
+                  <span className="block text-foreground font-medium mb-1">
+                    Label filter{" "}
+                    <span className="text-muted-foreground font-normal">(optional)</span>
+                  </span>
+                  <Input
+                    value={newLabelFilter}
+                    onChange={(e) => setNewLabelFilter(e.target.value)}
+                    placeholder="e.g. backend"
                   />
-                </SelectTrigger>
-                <SelectContent>
-                  {sourceOptions.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {s.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </label>
-          </div>
+                </label>
 
-          <div className="grid sm:grid-cols-2 gap-3">
-            <label className="text-sm">
-              <span className="block text-foreground font-medium mb-1">Repository</span>
-              <Select value={newRepo} onValueChange={setNewRepo}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select a repository..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableRepos.map((r) => (
-                    <SelectItem key={r.fullName} value={r.fullName.toLowerCase()}>
-                      {r.fullName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </label>
+                <div className="flex items-end pb-1">
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <Checkbox
+                      checked={newIsDefault}
+                      onCheckedChange={(checked) => setNewIsDefault(!!checked)}
+                    />
+                    <span>Default mapping</span>
+                  </label>
+                </div>
+              </div>
 
-            <label className="text-sm">
-              <span className="block text-foreground font-medium mb-1">
-                Label filter <span className="text-muted-foreground font-normal">(optional)</span>
-              </span>
-              <Input
-                value={newLabelFilter}
-                onChange={(e) => setNewLabelFilter(e.target.value)}
-                placeholder="e.g. backend"
-              />
-            </label>
-          </div>
-
-          <label className="flex items-center gap-2 text-sm cursor-pointer">
-            <Checkbox
-              checked={newIsDefault}
-              onCheckedChange={(checked) => setNewIsDefault(!!checked)}
-            />
-            <span>Mark as default mapping for this source</span>
-          </label>
-
-          <div className="flex items-center gap-2 pt-1">
-            <Button onClick={handleCreate} disabled={saving || !newSourceId || !newRepo}>
-              {saving ? "Adding..." : "Add Mapping"}
-            </Button>
-            <Button variant="outline" onClick={resetForm} disabled={saving}>
-              Cancel
-            </Button>
-          </div>
+              <div className="flex items-center gap-2 pt-1">
+                <Button onClick={handleCreate} disabled={saving || !newRepo}>
+                  {saving ? "Adding..." : "Add Mapping"}
+                </Button>
+                <Button variant="outline" onClick={() => setStep(1)} disabled={saving}>
+                  Back
+                </Button>
+                <Button variant="outline" onClick={resetForm} disabled={saving}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       ) : (
-        <Button onClick={() => setAdding(true)}>Add Mapping</Button>
+        <Button variant="outline" onClick={() => setAdding(true)} className="gap-1.5">
+          <PlusIcon className="w-3.5 h-3.5" />
+          Add Mapping
+        </Button>
       )}
     </div>
   );
@@ -386,35 +487,31 @@ function RepoMappingRow({
   availableRepos,
   linearTeams,
   linearProjects,
-  onError,
-  onSuccess,
 }: {
   mapping: RepoMapping;
   availableRepos: EnrichedRepository[];
   linearTeams: LinearTeam[];
   linearProjects: LinearProject[];
-  onError: (msg: string) => void;
-  onSuccess: (msg: string) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [editRepo, setEditRepo] = useState(`${mapping.repo_owner}/${mapping.repo_name}`);
   const [editLabelFilter, setEditLabelFilter] = useState(mapping.label_filter ?? "");
   const [editIsDefault, setEditIsDefault] = useState(mapping.is_default);
   const [saving, setSaving] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
-  // Find source name from teams/projects list (fallback to stored name)
   const sourceOptions = mapping.source_type === "team" ? linearTeams : linearProjects;
   const liveSource = sourceOptions.find((s) => s.id === mapping.source_id);
   const sourceName = liveSource?.name ?? mapping.source_name;
+  const sourceIcon = liveSource?.icon ?? null;
+  const sourceColor = liveSource?.color ?? null;
+  const sourceKey = mapping.source_type === "team" ? (liveSource as LinearTeam)?.key : undefined;
 
   const handleSave = async () => {
     const [repoOwner, repoName] = editRepo.split("/");
     if (!repoOwner || !repoName) return;
 
     setSaving(true);
-    onError("");
-    onSuccess("");
-
     try {
       const res = await fetch(`${REPO_MAPPINGS_KEY}/${mapping.id}`, {
         method: "PUT",
@@ -430,68 +527,63 @@ function RepoMappingRow({
       if (res.ok) {
         await mutate(REPO_MAPPINGS_KEY);
         setEditing(false);
-        onSuccess("Mapping updated.");
+        toast.success("Mapping updated.");
       } else {
         const data = await res.json();
-        onError((data as { error?: string }).error ?? "Failed to update mapping");
+        toast.error((data as { error?: string }).error ?? "Failed to update");
       }
     } catch {
-      onError("Failed to update mapping");
+      toast.error("Failed to update mapping");
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async () => {
-    onError("");
-    onSuccess("");
-
     try {
-      const res = await fetch(`${REPO_MAPPINGS_KEY}/${mapping.id}`, {
-        method: "DELETE",
-      });
-
+      const res = await fetch(`${REPO_MAPPINGS_KEY}/${mapping.id}`, { method: "DELETE" });
       if (res.ok) {
         await mutate(REPO_MAPPINGS_KEY);
-        onSuccess("Mapping removed.");
+        toast.success("Mapping removed.");
       } else {
         const data = await res.json();
-        onError((data as { error?: string }).error ?? "Failed to remove mapping");
+        toast.error((data as { error?: string }).error ?? "Failed to remove");
       }
     } catch {
-      onError("Failed to remove mapping");
+      toast.error("Failed to remove mapping");
     }
   };
 
-  const sourceTypeLabel = mapping.source_type === "team" ? "Team" : "Project";
-
   if (editing) {
     return (
-      <div className="border border-border rounded-sm p-3 space-y-3">
-        <div className="flex items-center gap-2 text-sm">
-          <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground">
-            {sourceTypeLabel}
-          </span>
-          <span className="font-medium text-foreground">{sourceName}</span>
+      <div className="border border-border rounded-md p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <SourceBadge
+            icon={sourceIcon}
+            color={sourceColor}
+            name={sourceName}
+            detail={sourceKey}
+            sourceType={mapping.source_type}
+          />
         </div>
 
-        <div className="grid sm:grid-cols-2 gap-3">
-          <label className="text-sm">
-            <span className="block text-foreground font-medium mb-1">Repository</span>
-            <Select value={editRepo} onValueChange={setEditRepo}>
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {availableRepos.map((r) => (
-                  <SelectItem key={r.fullName} value={r.fullName.toLowerCase()}>
-                    {r.fullName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </label>
+        <label className="text-sm">
+          <span className="block text-foreground font-medium mb-1">Repository</span>
+          <Select value={editRepo} onValueChange={setEditRepo}>
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {availableRepos.map((r) => (
+                <SelectItem key={r.fullName} value={r.fullName.toLowerCase()}>
+                  {r.fullName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </label>
 
+        <div className="grid sm:grid-cols-2 gap-3">
           <label className="text-sm">
             <span className="block text-foreground font-medium mb-1">
               Label filter <span className="text-muted-foreground font-normal">(optional)</span>
@@ -500,22 +592,23 @@ function RepoMappingRow({
               value={editLabelFilter}
               onChange={(e) => setEditLabelFilter(e.target.value)}
               placeholder="e.g. backend"
-              className="h-8"
             />
           </label>
-        </div>
 
-        <label className="flex items-center gap-2 text-sm cursor-pointer">
-          <Checkbox
-            checked={editIsDefault}
-            onCheckedChange={(checked) => setEditIsDefault(!!checked)}
-          />
-          <span>Default mapping for this source</span>
-        </label>
+          <div className="flex items-end pb-1">
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <Checkbox
+                checked={editIsDefault}
+                onCheckedChange={(checked) => setEditIsDefault(!!checked)}
+              />
+              <span>Default mapping</span>
+            </label>
+          </div>
+        </div>
 
         <div className="flex items-center gap-2">
           <Button size="sm" onClick={handleSave} disabled={saving || !editRepo}>
-            {saving ? "..." : "Save"}
+            {saving ? "Saving..." : "Save"}
           </Button>
           <Button size="sm" variant="outline" onClick={() => setEditing(false)} disabled={saving}>
             Cancel
@@ -526,32 +619,58 @@ function RepoMappingRow({
   }
 
   return (
-    <div className="flex items-center gap-3 px-3 py-2 border border-border rounded-sm text-sm">
-      <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground shrink-0">
-        {sourceTypeLabel}
-      </span>
-      <span className="font-medium text-foreground shrink-0">{sourceName}</span>
-      <span className="text-muted-foreground shrink-0">→</span>
-      <span className="text-foreground font-mono text-xs shrink-0">
+    <div className="group flex items-center gap-3 px-3 py-2.5 border border-border rounded-md hover:border-foreground/15 transition">
+      <SourceBadge
+        icon={sourceIcon}
+        color={sourceColor}
+        name={sourceName}
+        detail={sourceKey}
+        sourceType={mapping.source_type}
+      />
+
+      <span className="text-muted-foreground text-xs shrink-0">→</span>
+
+      <span className="text-foreground font-mono text-xs truncate">
         {mapping.repo_owner}/{mapping.repo_name}
       </span>
+
       {mapping.label_filter && (
-        <span className="px-1.5 py-0.5 rounded text-xs bg-blue-50 text-blue-700 border border-blue-200 shrink-0">
+        <span className="px-1.5 py-0.5 rounded text-[11px] bg-muted text-muted-foreground border border-border shrink-0">
           {mapping.label_filter}
         </span>
       )}
+
       {mapping.is_default && (
-        <span className="text-amber-500 shrink-0" title="Default mapping">
+        <span className="text-amber-500 text-xs shrink-0" title="Default mapping for this source">
           ★
         </span>
       )}
-      <div className="flex items-center gap-1 ml-auto shrink-0">
-        <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
-          Edit
-        </Button>
-        <Button size="sm" variant="destructive" onClick={handleDelete}>
-          Remove
-        </Button>
+
+      <div className="flex items-center gap-1 ml-auto shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+        <button
+          onClick={() => setEditing(true)}
+          className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition"
+          title="Edit"
+        >
+          <PencilIcon className="w-3.5 h-3.5" />
+        </button>
+        {confirmDelete ? (
+          <button
+            onClick={handleDelete}
+            className="px-2 py-1 rounded text-xs bg-red-500/10 text-red-500 hover:bg-red-500/20 transition"
+          >
+            Confirm
+          </button>
+        ) : (
+          <button
+            onClick={() => setConfirmDelete(true)}
+            onBlur={() => setTimeout(() => setConfirmDelete(false), 150)}
+            className="p-1.5 rounded hover:bg-red-500/10 text-muted-foreground hover:text-red-500 transition"
+            title="Remove"
+          >
+            <TrashIcon className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
     </div>
   );

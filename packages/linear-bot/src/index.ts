@@ -236,7 +236,13 @@ app.get("/config/teams", async (c) => {
     if (!client) return c.json({ teams: [] });
 
     const teamsResult = await client.teams();
-    const teams = teamsResult.nodes.map((t) => ({ id: t.id, name: t.name, key: t.key }));
+    const teams = teamsResult.nodes.map((t) => ({
+      id: t.id,
+      name: t.name,
+      key: t.key,
+      color: t.color ?? null,
+      icon: t.icon ?? null,
+    }));
     return c.json({ teams });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -258,7 +264,12 @@ app.get("/config/projects", async (c) => {
     if (!client) return c.json({ projects: [] });
 
     const projectsResult = await client.projects();
-    const projects = projectsResult.nodes.map((p) => ({ id: p.id, name: p.name }));
+    const projects = projectsResult.nodes.map((p) => ({
+      id: p.id,
+      name: p.name,
+      color: p.color ?? null,
+      icon: p.icon ?? null,
+    }));
     return c.json({ projects });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
