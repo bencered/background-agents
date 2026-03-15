@@ -227,33 +227,43 @@ function resolveLinearIcon(icon: string | null | undefined): LucideIcon | string
 
 function ScrollFade({ children, className }: { children: ReactNode; className?: string }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [canScroll, setCanScroll] = useState(false);
-  const [atBottom, setAtBottom] = useState(false);
+  const [atTop, setAtTop] = useState(true);
+  const [atBottom, setAtBottom] = useState(true);
 
   const checkScroll = useCallback(() => {
     const el = ref.current;
     if (!el) return;
-    const scrollable = el.scrollHeight > el.clientHeight;
-    setCanScroll(scrollable);
-    setAtBottom(scrollable && el.scrollTop + el.clientHeight >= el.scrollHeight - 2);
+    setAtTop(el.scrollTop <= 2);
+    setAtBottom(el.scrollTop + el.clientHeight >= el.scrollHeight - 2);
   }, []);
 
   useEffect(() => {
-    checkScroll();
     const el = ref.current;
     if (!el) return;
+    // Check on mount + whenever children change size
+    checkScroll();
+    const ro = new ResizeObserver(checkScroll);
+    ro.observe(el);
     el.addEventListener("scroll", checkScroll, { passive: true });
-    return () => el.removeEventListener("scroll", checkScroll);
+    return () => { ro.disconnect(); el.removeEventListener("scroll", checkScroll); };
   }, [checkScroll]);
 
+  // Use CSS mask so the container border stays visible
+  const maskImage = atTop && atBottom
+    ? undefined
+    : atTop
+      ? "linear-gradient(to bottom, black calc(100% - 24px), transparent 100%)"
+      : atBottom
+        ? "linear-gradient(to top, black calc(100% - 24px), transparent 100%)"
+        : "linear-gradient(to bottom, transparent 0%, black 24px, black calc(100% - 24px), transparent 100%)";
+
   return (
-    <div className="relative">
-      <div ref={ref} className={`overflow-y-auto ${className ?? ""}`}>
-        {children}
-      </div>
-      {canScroll && !atBottom && (
-        <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-background to-transparent rounded-b-md" />
-      )}
+    <div
+      ref={ref}
+      className={`overflow-y-auto ${className ?? ""}`}
+      style={maskImage ? { maskImage, WebkitMaskImage: maskImage } : undefined}
+    >
+      {children}
     </div>
   );
 }
