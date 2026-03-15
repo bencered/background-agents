@@ -1,6 +1,6 @@
 "use client";
 
-import { createElement, useEffect, useState, type ReactNode } from "react";
+import { createElement, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import useSWR, { mutate } from "swr";
 import { toast } from "sonner";
 import {
@@ -223,6 +223,41 @@ function resolveLinearIcon(icon: string | null | undefined): LucideIcon | string
 }
 
 
+// ─── Scroll Fade Container ─────────────────────────────────────────────────────
+
+function ScrollFade({ children, className }: { children: ReactNode; className?: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [canScroll, setCanScroll] = useState(false);
+  const [atBottom, setAtBottom] = useState(false);
+
+  const checkScroll = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    const scrollable = el.scrollHeight > el.clientHeight;
+    setCanScroll(scrollable);
+    setAtBottom(scrollable && el.scrollTop + el.clientHeight >= el.scrollHeight - 2);
+  }, []);
+
+  useEffect(() => {
+    checkScroll();
+    const el = ref.current;
+    if (!el) return;
+    el.addEventListener("scroll", checkScroll, { passive: true });
+    return () => el.removeEventListener("scroll", checkScroll);
+  }, [checkScroll]);
+
+  return (
+    <div className="relative">
+      <div ref={ref} className={`overflow-y-auto ${className ?? ""}`}>
+        {children}
+      </div>
+      {canScroll && !atBottom && (
+        <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-background to-transparent rounded-b-md" />
+      )}
+    </div>
+  );
+}
+
 // ─── Source Identity Badge ─────────────────────────────────────────────────────
 
 function SourceBadge({
@@ -405,7 +440,7 @@ function RepoMappingSection({
                   agent is authorized in your workspace.
                 </p>
               ) : (
-                <div className="max-h-48 overflow-y-auto border border-border rounded-md divide-y divide-border">
+                <ScrollFade className="max-h-48 border border-border rounded-md divide-y divide-border">
                   {sourceOptions.map((s) => {
                     const team = s as LinearTeam;
                     return (
@@ -429,7 +464,7 @@ function RepoMappingSection({
                       </button>
                     );
                   })}
-                </div>
+                </ScrollFade>
               )}
 
               <div className="flex justify-end">
