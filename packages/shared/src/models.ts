@@ -23,6 +23,7 @@ export const VALID_MODELS = [
   "opencode/kimi-k2.5",
   "opencode/minimax-m2.5",
   "opencode/glm-5",
+  "opencode-go/glm-5",
 ] as const;
 
 export type ValidModel = (typeof VALID_MODELS)[number];
@@ -130,6 +131,12 @@ export const MODEL_OPTIONS: ModelCategory[] = [
       { id: "opencode/glm-5", name: "GLM 5", description: "Z.ai 744B MoE" },
     ],
   },
+  {
+    category: "OpenCode Go",
+    models: [
+      { id: "opencode-go/glm-5", name: "GLM 5 (Go)", description: "Z.ai 744B MoE" },
+    ],
+  },
 ];
 
 /**
@@ -147,6 +154,8 @@ export const DEFAULT_ENABLED_MODELS: ValidModel[] = [
   "openai/gpt-5.2-codex",
   "openai/gpt-5.3-codex",
   "openai/gpt-5.3-codex-spark",
+  "opencode/glm-5",
+  "opencode-go/glm-5",
 ];
 
 // === Normalization ===

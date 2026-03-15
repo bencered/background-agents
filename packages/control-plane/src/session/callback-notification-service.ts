@@ -46,6 +46,7 @@ export class CallbackNotificationService {
   private readonly log: Logger;
   private readonly getSessionId: () => string;
   private _lastToolCallCallbackTs = 0;
+  private _lastToolResultCallbackTs = 0;
 
   constructor(deps: CallbackServiceDeps) {
     this.repository = deps.repository;
@@ -351,6 +352,102 @@ export class CallbackNotificationService {
       }
     } catch (e) {
       this.log.warn("callback.tool_call", {
+        message_id: messageId,
+        session_id: sessionId,
+        source,
+        tool,
+        outcome: "error",
+        error: e instanceof Error ? e : new Error(String(e)),
+        duration_ms: Date.now() - now,
+      });
+    }
+  }
+
+  /**
+   * Notify the originating client of a tool_result event (best-effort, throttled).
+   * Max 1 callback per 3 seconds per session.
+   */
+  async notifyToolResult(
+    messageId: string,
+    event: {
+      type: string;
+      tool?: string;
+      call_id?: string;
+      content?: unknown;
+      is_error?: boolean;
+    }
+  ): Promise<void> {
+    const now = Date.now();
+    if (now - this._lastToolResultCallbackTs < 3000) return;
+    this._lastToolResultCallbackTs = now;
+
+    const tool = event.tool ?? "unknown";
+
+    const message = this.repository.getMessageCallbackContext(messageId);
+    if (!message?.callback_context) return;
+    if (!this.env.INTERNAL_CALLBACK_SECRET) return;
+
+    const source = message.source ?? null;
+    const binding = this.getBinding(source);
+    if (!binding) return;
+
+    const sessionId = this.getSessionId();
+    const context = JSON.parse(message.callback_context);
+
+    // Truncate content to avoid oversized payloads
+    let resultContent = "";
+    if (typeof event.content === "string") {
+      resultContent = event.content.slice(0, 500);
+    } else if (Array.isArray(event.content)) {
+      // OpenCode returns content as array of {type, text} blocks
+      resultContent = event.content
+        .map((c: { text?: string }) => c.text ?? "")
+        .join("\n")
+        .slice(0, 500);
+    }
+
+    const payloadData = {
+      sessionId,
+      tool,
+      callId: event.call_id ?? "",
+      result: resultContent,
+      isError: event.is_error ?? false,
+      timestamp: now,
+      context,
+    };
+
+    const signature = await this.signPayload(payloadData, this.env.INTERNAL_CALLBACK_SECRET);
+    const payload = { ...payloadData, signature };
+
+    try {
+      const response = await binding.fetch("https://internal/callbacks/tool_result", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (response.ok) {
+        this.log.info("callback.tool_result", {
+          message_id: messageId,
+          session_id: sessionId,
+          source,
+          tool,
+          outcome: "success",
+          duration_ms: Date.now() - now,
+        });
+      } else {
+        this.log.warn("callback.tool_result", {
+          message_id: messageId,
+          session_id: sessionId,
+          source,
+          tool,
+          outcome: "error",
+          http_status: response.status,
+          duration_ms: Date.now() - now,
+        });
+      }
+    } catch (e) {
+      this.log.warn("callback.tool_result", {
         message_id: messageId,
         session_id: sessionId,
         source,

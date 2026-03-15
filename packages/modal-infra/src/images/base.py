@@ -121,6 +121,12 @@ base_image = (
         "playwright install chromium",
         "playwright install-deps chromium",
     )
+    # Set default git identity (prevents "Author identity unknown" errors that
+    # cause LLM agents to invent their own identity from context clues)
+    .run_commands(
+        'git config --global user.name "openinspect[bot]"',
+        'git config --global user.email "262466261+openinspect[bot]@users.noreply.github.com"',
+    )
     # Create working directories
     .run_commands(
         "mkdir -p /workspace",

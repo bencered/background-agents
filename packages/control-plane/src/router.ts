@@ -157,6 +157,20 @@ type CachedScmProvider =
 
 let cachedScmProvider: CachedScmProvider | null = null;
 
+/** Default git commit identity derived from GitHub App bot user config.
+ *  GITHUB_APP_BOT_ID is the *user ID* of the app's [bot] account (from
+ *  `GET /users/<slug>[bot]`), NOT the App ID. The slug comes from
+ *  GITHUB_APP_SLUG (defaults to "openinspect"). */
+function getDefaultScmIdentity(env: Env): { name: string; email: string } {
+  const slug = env.GITHUB_APP_SLUG || "openinspect";
+  const botUserId = env.GITHUB_APP_BOT_ID;
+  const name = `${slug}[bot]`;
+  const email = botUserId
+    ? `${botUserId}+${slug}[bot]@users.noreply.github.com`
+    : `${slug}[bot]@users.noreply.github.com`;
+  return { name, email };
+}
+
 function resolveDeploymentScmProvider(env: Env): SourceControlProviderName {
   const envValue = env.SCM_PROVIDER;
   if (!cachedScmProvider || cachedScmProvider.envValue !== envValue) {
@@ -681,8 +695,9 @@ async function handleCreateSession(
 
   const userId = body.userId || "anonymous";
   const scmLogin = body.scmLogin;
-  const scmName = body.scmName;
-  const scmEmail = body.scmEmail;
+  const defaultScm = getDefaultScmIdentity(env);
+  const scmName = body.scmName || defaultScm.name;
+  const scmEmail = body.scmEmail || defaultScm.email;
   const scmToken = body.scmToken;
   let scmTokenEncrypted: string | null = null;
 
@@ -1085,8 +1100,9 @@ async function handleSessionWsToken(
 
   const scmUserId = body.scmUserId;
   const scmLogin = body.scmLogin;
-  const scmName = body.scmName;
-  const scmEmail = body.scmEmail;
+  const defaultScm2 = getDefaultScmIdentity(env);
+  const scmName = body.scmName || defaultScm2.name;
+  const scmEmail = body.scmEmail || defaultScm2.email;
   const scmToken = body.scmToken;
   const scmTokenExpiresAt = body.scmTokenExpiresAt;
   const scmRefreshToken = body.scmRefreshToken;

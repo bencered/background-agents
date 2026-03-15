@@ -15,6 +15,7 @@ import { useEnabledModels } from "@/hooks/use-enabled-models";
 import { IntegrationSettingsSkeleton } from "./integration-settings-skeleton";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { RadioCard } from "@/components/ui/form-controls";
 import {
   Select,
@@ -36,8 +37,38 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+// ─── Repo Mapping Types ───────────────────────────────────────────────────────
+
+interface RepoMapping {
+  id: number;
+  integration_id: string;
+  source_type: "team" | "project";
+  source_id: string;
+  source_name: string;
+  repo_owner: string;
+  repo_name: string;
+  label_filter: string | null;
+  is_default: boolean;
+  created_at: number;
+  updated_at: number;
+}
+
+interface LinearTeam {
+  id: string;
+  name: string;
+  key: string;
+}
+
+interface LinearProject {
+  id: string;
+  name: string;
+}
+
 const GLOBAL_SETTINGS_KEY = "/api/integration-settings/linear";
 const REPO_SETTINGS_KEY = "/api/integration-settings/linear/repos";
+const REPO_MAPPINGS_KEY = "/api/integration-settings/linear/repo-mappings";
+const LINEAR_TEAMS_KEY = "/api/linear/teams";
+const LINEAR_PROJECTS_KEY = "/api/linear/projects";
 
 interface GlobalResponse {
   settings: LinearGlobalConfig | null;
@@ -56,12 +87,27 @@ interface ReposResponse {
   repos: EnrichedRepository[];
 }
 
+interface RepoMappingsResponse {
+  mappings: RepoMapping[];
+}
+
+interface LinearTeamsResponse {
+  teams: LinearTeam[];
+}
+
+interface LinearProjectsResponse {
+  projects: LinearProject[];
+}
+
 export function LinearIntegrationSettings() {
   const { data: globalData, isLoading: globalLoading } =
     useSWR<GlobalResponse>(GLOBAL_SETTINGS_KEY);
   const { data: repoSettingsData, isLoading: repoSettingsLoading } =
     useSWR<RepoListResponse>(REPO_SETTINGS_KEY);
   const { data: reposData } = useSWR<ReposResponse>("/api/repos");
+  const { data: repoMappingsData } = useSWR<RepoMappingsResponse>(REPO_MAPPINGS_KEY);
+  const { data: teamsData } = useSWR<LinearTeamsResponse>(LINEAR_TEAMS_KEY);
+  const { data: projectsData } = useSWR<LinearProjectsResponse>(LINEAR_PROJECTS_KEY);
   const { enabledModelOptions } = useEnabledModels();
 
   if (globalLoading || repoSettingsLoading) {
@@ -71,6 +117,9 @@ export function LinearIntegrationSettings() {
   const settings = globalData?.settings;
   const repoOverrides = repoSettingsData?.repos ?? [];
   const availableRepos = reposData?.repos ?? [];
+  const repoMappings = repoMappingsData?.mappings ?? [];
+  const linearTeams = teamsData?.teams ?? [];
+  const linearProjects = projectsData?.projects ?? [];
 
   return (
     <div>
@@ -94,6 +143,18 @@ export function LinearIntegrationSettings() {
         )}
       </Section>
 
+      <Section
+        title="Repository Mapping"
+        description="Map Linear teams or projects to specific GitHub repositories. Project mappings take priority over team mappings."
+      >
+        <RepoMappingSection
+          mappings={repoMappings}
+          availableRepos={availableRepos}
+          linearTeams={linearTeams}
+          linearProjects={linearProjects}
+        />
+      </Section>
+
       <GlobalSettingsSection
         settings={settings}
         availableRepos={availableRepos}
@@ -110,6 +171,392 @@ export function LinearIntegrationSettings() {
           enabledModelOptions={enabledModelOptions}
         />
       </Section>
+    </div>
+  );
+}
+
+function RepoMappingSection({
+  mappings,
+  availableRepos,
+  linearTeams,
+  linearProjects,
+}: {
+  mappings: RepoMapping[];
+  availableRepos: EnrichedRepository[];
+  linearTeams: LinearTeam[];
+  linearProjects: LinearProject[];
+}) {
+  const [adding, setAdding] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  // New mapping form state
+  const [newSourceType, setNewSourceType] = useState<"team" | "project">("team");
+  const [newSourceId, setNewSourceId] = useState("");
+  const [newRepo, setNewRepo] = useState("");
+  const [newLabelFilter, setNewLabelFilter] = useState("");
+  const [newIsDefault, setNewIsDefault] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const sourceOptions = newSourceType === "team" ? linearTeams : linearProjects;
+  const selectedSource = sourceOptions.find((s) => s.id === newSourceId);
+
+  const resetForm = () => {
+    setNewSourceType("team");
+    setNewSourceId("");
+    setNewRepo("");
+    setNewLabelFilter("");
+    setNewIsDefault(false);
+    setAdding(false);
+  };
+
+  const handleCreate = async () => {
+    if (!newSourceId || !newRepo) return;
+    const [repoOwner, repoName] = newRepo.split("/");
+    if (!repoOwner || !repoName) return;
+
+    setSaving(true);
+    setError("");
+    setSuccess("");
+
+    const sourceName = selectedSource?.name ?? newSourceId;
+
+    try {
+      const res = await fetch(REPO_MAPPINGS_KEY, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source_type: newSourceType,
+          source_id: newSourceId,
+          source_name: sourceName,
+          repo_owner: repoOwner,
+          repo_name: repoName,
+          label_filter: newLabelFilter.trim() || null,
+          is_default: newIsDefault,
+        }),
+      });
+
+      if (res.ok) {
+        await mutate(REPO_MAPPINGS_KEY);
+        resetForm();
+        setSuccess("Mapping added.");
+      } else {
+        const data = await res.json();
+        setError((data as { error?: string }).error ?? "Failed to add mapping");
+      }
+    } catch {
+      setError("Failed to add mapping");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div>
+      {error && <Message tone="error" text={error} />}
+      {success && <Message tone="success" text={success} />}
+
+      {mappings.length > 0 ? (
+        <div className="space-y-2 mb-4">
+          {mappings.map((m) => (
+            <RepoMappingRow
+              key={m.id}
+              mapping={m}
+              availableRepos={availableRepos}
+              linearTeams={linearTeams}
+              linearProjects={linearProjects}
+              onError={setError}
+              onSuccess={setSuccess}
+            />
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground mb-4">
+          No repository mappings yet. Add one to automatically route Linear issues to specific repos.
+        </p>
+      )}
+
+      {adding ? (
+        <div className="border border-border rounded-sm p-4 space-y-3">
+          <p className="text-sm font-medium text-foreground">Add Repository Mapping</p>
+
+          <div className="grid sm:grid-cols-2 gap-3">
+            <label className="text-sm">
+              <span className="block text-foreground font-medium mb-1">Source type</span>
+              <Select
+                value={newSourceType}
+                onValueChange={(v) => {
+                  setNewSourceType(v as "team" | "project");
+                  setNewSourceId("");
+                }}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="team">Team</SelectItem>
+                  <SelectItem value="project">Project</SelectItem>
+                </SelectContent>
+              </Select>
+            </label>
+
+            <label className="text-sm">
+              <span className="block text-foreground font-medium mb-1">
+                {newSourceType === "team" ? "Team" : "Project"}
+              </span>
+              <Select value={newSourceId} onValueChange={setNewSourceId}>
+                <SelectTrigger className="w-full">
+                  <SelectValue
+                    placeholder={
+                      sourceOptions.length === 0
+                        ? newSourceType === "team"
+                          ? "No teams found (OAuth required)"
+                          : "No projects found (OAuth required)"
+                        : `Select a ${newSourceType}...`
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {sourceOptions.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </label>
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-3">
+            <label className="text-sm">
+              <span className="block text-foreground font-medium mb-1">Repository</span>
+              <Select value={newRepo} onValueChange={setNewRepo}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select a repository..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableRepos.map((r) => (
+                    <SelectItem key={r.fullName} value={r.fullName.toLowerCase()}>
+                      {r.fullName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </label>
+
+            <label className="text-sm">
+              <span className="block text-foreground font-medium mb-1">
+                Label filter <span className="text-muted-foreground font-normal">(optional)</span>
+              </span>
+              <Input
+                value={newLabelFilter}
+                onChange={(e) => setNewLabelFilter(e.target.value)}
+                placeholder="e.g. backend"
+              />
+            </label>
+          </div>
+
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <Checkbox
+              checked={newIsDefault}
+              onCheckedChange={(checked) => setNewIsDefault(!!checked)}
+            />
+            <span>Mark as default mapping for this source</span>
+          </label>
+
+          <div className="flex items-center gap-2 pt-1">
+            <Button
+              onClick={handleCreate}
+              disabled={saving || !newSourceId || !newRepo}
+            >
+              {saving ? "Adding..." : "Add Mapping"}
+            </Button>
+            <Button variant="outline" onClick={resetForm} disabled={saving}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <Button onClick={() => setAdding(true)}>Add Mapping</Button>
+      )}
+    </div>
+  );
+}
+
+function RepoMappingRow({
+  mapping,
+  availableRepos,
+  linearTeams,
+  linearProjects,
+  onError,
+  onSuccess,
+}: {
+  mapping: RepoMapping;
+  availableRepos: EnrichedRepository[];
+  linearTeams: LinearTeam[];
+  linearProjects: LinearProject[];
+  onError: (msg: string) => void;
+  onSuccess: (msg: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [editRepo, setEditRepo] = useState(
+    `${mapping.repo_owner}/${mapping.repo_name}`
+  );
+  const [editLabelFilter, setEditLabelFilter] = useState(mapping.label_filter ?? "");
+  const [editIsDefault, setEditIsDefault] = useState(mapping.is_default);
+  const [saving, setSaving] = useState(false);
+
+  // Find source name from teams/projects list (fallback to stored name)
+  const sourceOptions = mapping.source_type === "team" ? linearTeams : linearProjects;
+  const liveSource = sourceOptions.find((s) => s.id === mapping.source_id);
+  const sourceName = liveSource?.name ?? mapping.source_name;
+
+  const handleSave = async () => {
+    const [repoOwner, repoName] = editRepo.split("/");
+    if (!repoOwner || !repoName) return;
+
+    setSaving(true);
+    onError("");
+    onSuccess("");
+
+    try {
+      const res = await fetch(`${REPO_MAPPINGS_KEY}/${mapping.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          repo_owner: repoOwner,
+          repo_name: repoName,
+          label_filter: editLabelFilter.trim() || null,
+          is_default: editIsDefault,
+        }),
+      });
+
+      if (res.ok) {
+        await mutate(REPO_MAPPINGS_KEY);
+        setEditing(false);
+        onSuccess("Mapping updated.");
+      } else {
+        const data = await res.json();
+        onError((data as { error?: string }).error ?? "Failed to update mapping");
+      }
+    } catch {
+      onError("Failed to update mapping");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    onError("");
+    onSuccess("");
+
+    try {
+      const res = await fetch(`${REPO_MAPPINGS_KEY}/${mapping.id}`, {
+        method: "DELETE",
+      });
+
+      if (res.ok) {
+        await mutate(REPO_MAPPINGS_KEY);
+        onSuccess("Mapping removed.");
+      } else {
+        const data = await res.json();
+        onError((data as { error?: string }).error ?? "Failed to remove mapping");
+      }
+    } catch {
+      onError("Failed to remove mapping");
+    }
+  };
+
+  const sourceTypeLabel = mapping.source_type === "team" ? "Team" : "Project";
+
+  if (editing) {
+    return (
+      <div className="border border-border rounded-sm p-3 space-y-3">
+        <div className="flex items-center gap-2 text-sm">
+          <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground">
+            {sourceTypeLabel}
+          </span>
+          <span className="font-medium text-foreground">{sourceName}</span>
+        </div>
+
+        <div className="grid sm:grid-cols-2 gap-3">
+          <label className="text-sm">
+            <span className="block text-foreground font-medium mb-1">Repository</span>
+            <Select value={editRepo} onValueChange={setEditRepo}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {availableRepos.map((r) => (
+                  <SelectItem key={r.fullName} value={r.fullName.toLowerCase()}>
+                    {r.fullName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </label>
+
+          <label className="text-sm">
+            <span className="block text-foreground font-medium mb-1">
+              Label filter <span className="text-muted-foreground font-normal">(optional)</span>
+            </span>
+            <Input
+              value={editLabelFilter}
+              onChange={(e) => setEditLabelFilter(e.target.value)}
+              placeholder="e.g. backend"
+              className="h-8"
+            />
+          </label>
+        </div>
+
+        <label className="flex items-center gap-2 text-sm cursor-pointer">
+          <Checkbox
+            checked={editIsDefault}
+            onCheckedChange={(checked) => setEditIsDefault(!!checked)}
+          />
+          <span>Default mapping for this source</span>
+        </label>
+
+        <div className="flex items-center gap-2">
+          <Button size="sm" onClick={handleSave} disabled={saving || !editRepo}>
+            {saving ? "..." : "Save"}
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setEditing(false)} disabled={saving}>
+            Cancel
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-3 px-3 py-2 border border-border rounded-sm text-sm">
+      <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground shrink-0">
+        {sourceTypeLabel}
+      </span>
+      <span className="font-medium text-foreground shrink-0">{sourceName}</span>
+      <span className="text-muted-foreground shrink-0">→</span>
+      <span className="text-foreground font-mono text-xs shrink-0">
+        {mapping.repo_owner}/{mapping.repo_name}
+      </span>
+      {mapping.label_filter && (
+        <span className="px-1.5 py-0.5 rounded text-xs bg-blue-50 text-blue-700 border border-blue-200 shrink-0">
+          {mapping.label_filter}
+        </span>
+      )}
+      {mapping.is_default && (
+        <span className="text-amber-500 shrink-0" title="Default mapping">
+          ★
+        </span>
+      )}
+      <div className="flex items-center gap-1 ml-auto shrink-0">
+        <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
+          Edit
+        </Button>
+        <Button size="sm" variant="destructive" onClick={handleDelete}>
+          Remove
+        </Button>
+      </div>
     </div>
   );
 }

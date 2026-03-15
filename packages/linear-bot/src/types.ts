@@ -177,31 +177,6 @@ export interface LinearIssueDetails {
 
 // ─── Webhook Payload Types ──────────────────────────────────────────────────
 
-export interface AgentSessionWebhookIssue {
-  id: string;
-  identifier: string;
-  title: string;
-  description?: string;
-  url: string;
-  priority: number;
-  priorityLabel: string;
-  team: { id: string; key: string; name: string };
-  teamId?: string;
-  labels?: Array<{ id: string; name: string }>;
-  assignee?: { id: string; name: string };
-  project?: { id: string; name: string };
-}
-
-export interface AgentSessionWebhook {
-  type: string;
-  action: string;
-  organizationId: string;
-  appUserId?: string;
-  agentSession: {
-    id: string;
-    issue?: AgentSessionWebhookIssue;
-    comment?: { body: string };
-    promptContext?: string;
-  };
-  agentActivity?: { body?: string };
-}
+// Re-export the Zod-validated webhook type from shared
+// Webhook type now from @linear/sdk/webhooks (AgentSessionEventWebhookPayload)
+// AgentSessionWebhookSchema exported from ./schemas

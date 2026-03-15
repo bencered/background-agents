@@ -1,8 +1,11 @@
 /**
- * Linear API client utilities — OAuth + raw GraphQL.
+ * Linear API client utilities — OAuth + @linear/sdk.
  */
 
-import type { Env, OAuthTokenResponse, StoredTokenData, LinearIssueDetails } from "../types";
+import { LinearClient } from "@linear/sdk";
+import type { AgentActivityCreateInput } from "@linear/sdk";
+import type { Env, LinearIssueDetails } from "../types";
+import { OAuthTokenResponseSchema, StoredTokenDataSchema } from "../schemas";
 import { timingSafeEqual } from "@open-inspect/shared";
 import { computeHmacHex } from "./crypto";
 import { createLogger } from "../logger";
@@ -11,6 +14,17 @@ const log = createLogger("linear-client");
 
 const LINEAR_API_URL = "https://api.linear.app/graphql";
 const OAUTH_TOKEN_KEY_PREFIX = "oauth:token:";
+
+// Re-export LinearClient as the client type for callers
+export type LinearApiClient = LinearClient;
+
+// ─── StoredTokenData ─────────────────────────────────────────────────────────
+
+interface StoredTokenData {
+  access_token: string;
+  refresh_token: string;
+  expires_at: number;
+}
 
 // ─── OAuth Helpers ───────────────────────────────────────────────────────────
 
@@ -49,17 +63,22 @@ export async function exchangeCodeForToken(
     throw new Error(`Token exchange failed: ${errText}`);
   }
 
-  const tokenData = (await tokenRes.json()) as OAuthTokenResponse;
-  const workspaceInfo = await getWorkspaceInfo(tokenData.access_token);
+  const tokenData = OAuthTokenResponseSchema.parse(await tokenRes.json());
+
+  // Use SDK to get workspace info
+  const tempClient = new LinearClient({ accessToken: tokenData.access_token });
+  const viewer = await tempClient.viewer;
+  const org = await viewer.organization;
+  if (!org) throw new Error("No organization found");
 
   const stored: StoredTokenData = {
     access_token: tokenData.access_token,
     refresh_token: tokenData.refresh_token,
     expires_at: Date.now() + tokenData.expires_in * 1000,
   };
-  await env.LINEAR_KV.put(getWorkspaceTokenKey(workspaceInfo.id), JSON.stringify(stored));
+  await env.LINEAR_KV.put(getWorkspaceTokenKey(org.id), JSON.stringify(stored));
 
-  return { orgId: workspaceInfo.id, orgName: workspaceInfo.name };
+  return { orgId: org.id, orgName: org.name };
 }
 
 export async function getOAuthToken(env: Env, orgId: string): Promise<string | null> {
@@ -68,7 +87,7 @@ export async function getOAuthToken(env: Env, orgId: string): Promise<string | n
 
   let tokenData: StoredTokenData;
   try {
-    tokenData = JSON.parse(raw) as StoredTokenData;
+    tokenData = StoredTokenDataSchema.parse(JSON.parse(raw));
   } catch {
     return null;
   }
@@ -97,7 +116,7 @@ export async function getOAuthToken(env: Env, orgId: string): Promise<string | n
       return null;
     }
 
-    const refreshed = (await res.json()) as OAuthTokenResponse;
+    const refreshed = OAuthTokenResponseSchema.parse(await res.json());
     const newStored: StoredTokenData = {
       access_token: refreshed.access_token,
       refresh_token: refreshed.refresh_token,
@@ -114,69 +133,90 @@ export async function getOAuthToken(env: Env, orgId: string): Promise<string | n
   }
 }
 
-// ─── Linear API Client ──────────────────────────────────────────────────────
+// ─── Linear SDK Client ──────────────────────────────────────────────────────
 
-export interface LinearApiClient {
-  accessToken: string;
-}
-
-export async function getLinearClient(env: Env, orgId: string): Promise<LinearApiClient | null> {
+export async function getLinearClient(env: Env, orgId: string): Promise<LinearClient | null> {
   const token = await getOAuthToken(env, orgId);
   if (!token) return null;
-  return { accessToken: token };
-}
-
-/**
- * Execute a GraphQL query against the Linear API.
- */
-async function linearGraphQL(
-  client: LinearApiClient,
-  query: string,
-  variables: Record<string, unknown>
-): Promise<Record<string, unknown>> {
-  const res = await fetch(LINEAR_API_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${client.accessToken}`,
-    },
-    body: JSON.stringify({ query, variables }),
-  });
-
-  if (!res.ok) {
-    throw new Error(`Linear API error: ${res.status}`);
-  }
-
-  return (await res.json()) as Record<string, unknown>;
+  return new LinearClient({ accessToken: token });
 }
 
 // ─── Agent Activities ────────────────────────────────────────────────────────
 
 export async function emitAgentActivity(
-  client: LinearApiClient,
+  client: LinearClient,
   agentSessionId: string,
-  content: Record<string, unknown>,
-  ephemeral?: boolean
+  content: AgentActivityCreateInput["content"],
+  ephemeral?: boolean,
+  signal?: string,
+  signalMetadata?: Record<string, unknown>
 ): Promise<void> {
   try {
-    await linearGraphQL(
-      client,
-      `
-      mutation AgentActivityCreate($input: AgentActivityCreateInput!) {
-        agentActivityCreate(input: $input) {
-          success
-        }
-      }
-    `,
-      {
-        input: { agentSessionId, content, ephemeral },
-      }
-    );
+    const input: AgentActivityCreateInput = { agentSessionId, content, ephemeral };
+    if (signal) input.signal = signal;
+    if (signalMetadata) input.signalMetadata = signalMetadata;
+    await client.createAgentActivity(input);
   } catch (err) {
     log.error("linear.emit_activity_failed", {
       agent_session_id: agentSessionId,
       error: err instanceof Error ? err : new Error(String(err)),
     });
+  }
+}
+
+/**
+ * Fetch the first "started" workflow state for a team (lowest position).
+ */
+export async function getTeamStartedState(
+  client: LinearClient,
+  teamId: string
+): Promise<{ id: string; name: string } | null> {
+  try {
+    const team = await client.team(teamId);
+    const states = await team.states({ filter: { type: { eq: "started" } } });
+    const nodes = states.nodes;
+
+    if (!nodes || nodes.length === 0) return null;
+    const sorted = [...nodes].sort((a, b) => a.position - b.position);
+    return { id: sorted[0].id, name: sorted[0].name };
+  } catch (err) {
+    log.error("linear.get_team_started_state", {
+      team_id: teamId,
+      error: err instanceof Error ? err : new Error(String(err)),
+    });
+    return null;
+  }
+}
+
+/**
+ * Update an issue (status, delegate, etc.)
+ */
+export async function updateIssue(
+  client: LinearClient,
+  issueId: string,
+  input: Record<string, unknown>
+): Promise<boolean> {
+  try {
+    const result = await client.updateIssue(issueId, input);
+    return result.success;
+  } catch (err) {
+    log.error("linear.update_issue_failed", {
+      issue_id: issueId,
+      error: err instanceof Error ? err : new Error(String(err)),
+    });
+    return false;
+  }
+}
+
+/**
+ * Get the app user ID for the current OAuth token (the bot's identity).
+ */
+export async function getAppUserId(client: LinearClient): Promise<string | null> {
+  try {
+    const viewer = await client.viewer;
+    return viewer.id;
+  } catch {
+    return null;
   }
 }
 
@@ -186,56 +226,40 @@ export async function emitAgentActivity(
  * Fetch full issue details from Linear API.
  */
 export async function fetchIssueDetails(
-  client: LinearApiClient,
+  client: LinearClient,
   issueId: string
 ): Promise<LinearIssueDetails | null> {
   try {
-    const data = await linearGraphQL(
-      client,
-      `
-      query IssueDetails($id: String!) {
-        issue(id: $id) {
-          id
-          identifier
-          title
-          description
-          url
-          priority
-          priorityLabel
-          labels { nodes { id name } }
-          project { id name }
-          assignee { id name }
-          team { id key name }
-          comments(first: 10, orderBy: createdAt) {
-            nodes {
-              body
-              user { name }
-            }
-          }
-        }
-      }
-    `,
-      { id: issueId }
-    );
+    const issue = await client.issue(issueId);
+    const labels = await issue.labels();
+    const project = await issue.project;
+    const assignee = await issue.assignee;
+    const team = await issue.team;
+    const comments = await issue.comments({ first: 10 });
 
-    const issue = (data as { data?: { issue?: Record<string, unknown> } }).data?.issue;
-    if (!issue) return null;
+    if (!team) return null;
 
     return {
-      id: issue.id as string,
-      identifier: issue.identifier as string,
-      title: issue.title as string,
-      description: issue.description as string | null,
-      url: issue.url as string,
-      priority: issue.priority as number,
-      priorityLabel: issue.priorityLabel as string,
-      labels: (issue.labels as { nodes: Array<{ id: string; name: string }> })?.nodes || [],
-      project: issue.project as { id: string; name: string } | null,
-      assignee: issue.assignee as { id: string; name: string } | null,
-      team: issue.team as { id: string; key: string; name: string },
-      comments:
-        (issue.comments as { nodes: Array<{ body: string; user?: { name: string } }> })?.nodes ||
-        [],
+      id: issue.id,
+      identifier: issue.identifier,
+      title: issue.title,
+      description: issue.description ?? null,
+      url: issue.url,
+      priority: issue.priority,
+      priorityLabel: issue.priorityLabel,
+      labels: labels.nodes.map((l) => ({ id: l.id, name: l.name })),
+      project: project ? { id: project.id, name: project.name } : null,
+      assignee: assignee ? { id: assignee.id, name: assignee.name } : null,
+      team: { id: team.id, key: team.key, name: team.name },
+      comments: await Promise.all(
+        comments.nodes.map(async (c) => {
+          const user = await c.user;
+          return {
+            body: c.body,
+            user: user ? { name: user.displayName } : undefined,
+          };
+        })
+      ),
     };
   } catch (err) {
     log.error("linear.fetch_issue_details", {
@@ -252,22 +276,12 @@ export async function fetchIssueDetails(
  * Update an agent session (externalUrls, plan, etc.)
  */
 export async function updateAgentSession(
-  client: LinearApiClient,
+  client: LinearClient,
   agentSessionId: string,
   input: Record<string, unknown>
 ): Promise<void> {
   try {
-    await linearGraphQL(
-      client,
-      `
-      mutation AgentSessionUpdate($id: String!, $input: AgentSessionUpdateInput!) {
-        agentSessionUpdate(id: $id, input: $input) {
-          success
-        }
-      }
-    `,
-      { id: agentSessionId, input }
-    );
+    await client.updateAgentSession(agentSessionId, input);
   } catch (err) {
     log.error("linear.update_session_failed", {
       agent_session_id: agentSessionId,
@@ -280,39 +294,17 @@ export async function updateAgentSession(
  * Use Linear's built-in repo suggestion API for issue→repo matching.
  */
 export async function getRepoSuggestions(
-  client: LinearApiClient,
+  client: LinearClient,
   issueId: string,
   agentSessionId: string,
   candidateRepos: Array<{ hostname: string; repositoryFullName: string }>
 ): Promise<Array<{ repositoryFullName: string; confidence: number }>> {
   try {
-    const data = await linearGraphQL(
-      client,
-      `
-      query RepoSuggestions($issueId: String!, $agentSessionId: String!, $candidateRepositories: [IssueRepositorySuggestionInput!]!) {
-        issueRepositorySuggestions(
-          issueId: $issueId
-          agentSessionId: $agentSessionId
-          candidateRepositories: $candidateRepositories
-        ) {
-          suggestions {
-            repositoryFullName
-            confidence
-          }
-        }
-      }
-    `,
-      { issueId, agentSessionId, candidateRepositories: candidateRepos }
-    );
-
-    const result = data as {
-      data?: {
-        issueRepositorySuggestions?: {
-          suggestions: Array<{ repositoryFullName: string; confidence: number }>;
-        };
-      };
-    };
-    return result.data?.issueRepositorySuggestions?.suggestions || [];
+    const result = await client.issueRepositorySuggestions(issueId, agentSessionId, candidateRepos);
+    return result.suggestions.map((s) => ({
+      repositoryFullName: s.repositoryFullName,
+      confidence: s.confidence,
+    }));
   } catch (err) {
     log.error("linear.repo_suggestions_failed", {
       issue_id: issueId,
@@ -334,7 +326,7 @@ export async function verifyLinearWebhook(
   return timingSafeEqual(signature, expectedHex);
 }
 
-// ─── Comment Posting (fallback) ──────────────────────────────────────────────
+// ─── Comment Posting (fallback using raw API key) ────────────────────────────
 
 export async function postIssueComment(
   apiKey: string,
@@ -358,32 +350,6 @@ export async function postIssueComment(
   });
 
   if (!response.ok) return { success: false };
-  const result = (await response.json()) as {
-    data?: { commentCreate?: { success: boolean } };
-  };
-  return { success: result.data?.commentCreate?.success ?? false };
-}
-
-// ─── Internal Helpers ────────────────────────────────────────────────────────
-
-async function getWorkspaceInfo(accessToken: string): Promise<{ id: string; name: string }> {
-  const res = await fetch(LINEAR_API_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${accessToken}`,
-    },
-    body: JSON.stringify({
-      query: `query { viewer { organization { id name } } }`,
-    }),
-  });
-
-  if (!res.ok) throw new Error(`Failed to get workspace info: ${res.statusText}`);
-
-  const data = (await res.json()) as {
-    data?: { viewer?: { organization?: { id: string; name: string } } };
-  };
-  const org = data.data?.viewer?.organization;
-  if (!org) throw new Error("No organization found in response");
-  return { id: org.id, name: org.name };
+  const data = await response.json() as { data?: { commentCreate?: { success: boolean } } }; // intentional cast — fallback path
+  return { success: data?.data?.commentCreate?.success ?? false };
 }

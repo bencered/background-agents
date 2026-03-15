@@ -3,9 +3,10 @@
  * Same pattern as slack-bot: local cache + KV cache + fallback.
  */
 
-import type { Env, RepoConfig, ControlPlaneRepo, ControlPlaneReposResponse } from "../types";
+import type { Env, RepoConfig, ControlPlaneRepo } from "../types";
 import { generateInternalToken } from "../utils/internal";
 import { createLogger } from "../logger";
+import { ControlPlaneReposResponseSchema, RepoConfigArraySchema } from "../schemas";
 
 const log = createLogger("repos");
 
@@ -59,7 +60,7 @@ export async function getAvailableRepos(env: Env, traceId?: string): Promise<Rep
       return getFromCacheOrFallback(env);
     }
 
-    const data = (await response.json()) as ControlPlaneReposResponse;
+    const data = ControlPlaneReposResponseSchema.parse(await response.json());
     const repos = data.repos.map(toRepoConfig);
 
     localCache = { repos, timestamp: Date.now() };
@@ -98,7 +99,7 @@ async function getFromCacheOrFallback(env: Env): Promise<RepoConfig[]> {
     const cached = await env.LINEAR_KV.get("repos:cache", "json");
     if (cached && Array.isArray(cached)) {
       log.info("control_plane.fetch_repos", { source: "kv_cache" });
-      return cached as RepoConfig[];
+      return RepoConfigArraySchema.parse(cached);
     }
   } catch (e) {
     log.warn("kv.get", {

@@ -5,9 +5,6 @@
 
 import type {
   Env,
-  EventResponse,
-  ListEventsResponse,
-  ListArtifactsResponse,
   AgentResponse,
   ToolCallSummary,
   ArtifactInfo,
@@ -15,6 +12,7 @@ import type {
 import type { ArtifactType } from "@open-inspect/shared";
 import { generateInternalToken } from "../utils/internal";
 import { createLogger } from "../logger";
+import { ListEventsResponseSchema, ListArtifactsResponseSchema } from "../schemas";
 
 const log = createLogger("extractor");
 
@@ -56,7 +54,7 @@ export async function extractAgentResponse(
         return { textContent: "", toolCalls: [], artifacts: [], success: false };
       }
 
-      const data = (await response.json()) as ListEventsResponse;
+      const data = ListEventsResponseSchema.parse(await response.json());
       allEvents.push(...data.events);
       cursor = data.hasMore ? data.cursor : undefined;
     } while (cursor);
@@ -65,7 +63,7 @@ export async function extractAgentResponse(
     const tokenEvents = allEvents
       .filter((e): e is EventResponse & { type: "token" } => e.type === "token")
       .sort((a, b) => {
-        const timeDiff = (a.createdAt as number) - (b.createdAt as number);
+        const timeDiff = Number(a.createdAt) - Number(b.createdAt);
         return timeDiff !== 0 ? timeDiff : a.id.localeCompare(b.id);
       });
     const lastToken = tokenEvents[tokenEvents.length - 1];
@@ -127,7 +125,7 @@ async function fetchSessionArtifacts(
     );
     if (!response.ok) return [];
 
-    const data = (await response.json()) as ListArtifactsResponse;
+    const data = ListArtifactsResponseSchema.parse(await response.json());
     return data.artifacts.map((a) => ({
       type: a.type,
       url: a.url ? String(a.url) : "",
@@ -146,7 +144,7 @@ async function fetchSessionArtifacts(
 
 function summarizeToolCall(data: Record<string, unknown>): ToolCallSummary {
   const tool = String(data.tool ?? "Unknown");
-  const args = (data.args ?? {}) as Record<string, unknown>;
+  const args = (data.args && typeof data.args === "object" ? data.args : {}) as Record<string, unknown>;
   switch (tool) {
     case "Read":
       return { tool, summary: `Read ${args.file_path ?? "file"}` };
@@ -165,14 +163,20 @@ function summarizeToolCall(data: Record<string, unknown>): ToolCallSummary {
   }
 }
 
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
 function getArtifactLabel(data: Record<string, unknown>): string {
   const type = String(data.artifactType ?? "artifact");
   if (type === "pr") {
-    const metadata = data.metadata as Record<string, unknown> | undefined;
+    const metadata = asRecord(data.metadata);
     return metadata?.number ? `PR #${metadata.number}` : "Pull Request";
   }
   if (type === "branch") {
-    const metadata = data.metadata as Record<string, unknown> | undefined;
+    const metadata = asRecord(data.metadata);
     return `Branch: ${metadata?.name ?? "branch"}`;
   }
   return type;

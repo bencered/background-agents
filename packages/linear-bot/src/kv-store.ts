@@ -10,6 +10,14 @@ import type {
   UserPreferences,
   IssueSession,
 } from "./types";
+import {
+  TeamRepoMappingSchema,
+  ProjectRepoMappingSchema,
+  TriggerConfigSchema,
+  UserPreferencesSchema,
+  IssueSessionSchema,
+  PendingClassificationSchema,
+} from "./schemas";
 import { createLogger } from "./logger";
 
 const log = createLogger("kv-store");
@@ -23,7 +31,7 @@ export const DEFAULT_TRIGGER_CONFIG: TriggerConfig = {
 export async function getTeamRepoMapping(env: Env): Promise<TeamRepoMapping> {
   try {
     const data = await env.LINEAR_KV.get("config:team-repos", "json");
-    if (data && typeof data === "object") return data as TeamRepoMapping;
+    return TeamRepoMappingSchema.parse(data);
   } catch (e) {
     log.debug("kv.get_team_repo_mapping_failed", {
       error: e instanceof Error ? e.message : String(e),
@@ -35,7 +43,7 @@ export async function getTeamRepoMapping(env: Env): Promise<TeamRepoMapping> {
 export async function getProjectRepoMapping(env: Env): Promise<ProjectRepoMapping> {
   try {
     const data = await env.LINEAR_KV.get("config:project-repos", "json");
-    if (data && typeof data === "object") return data as ProjectRepoMapping;
+    return ProjectRepoMappingSchema.parse(data);
   } catch (e) {
     log.debug("kv.get_project_repo_mapping_failed", {
       error: e instanceof Error ? e.message : String(e),
@@ -47,9 +55,8 @@ export async function getProjectRepoMapping(env: Env): Promise<ProjectRepoMappin
 export async function getTriggerConfig(env: Env): Promise<TriggerConfig> {
   try {
     const data = await env.LINEAR_KV.get("config:triggers", "json");
-    if (data && typeof data === "object") {
-      return { ...DEFAULT_TRIGGER_CONFIG, ...(data as Partial<TriggerConfig>) };
-    }
+    const parsed = TriggerConfigSchema.partial().parse(data);
+    return { ...DEFAULT_TRIGGER_CONFIG, ...parsed };
   } catch (e) {
     log.debug("kv.get_trigger_config_failed", {
       error: e instanceof Error ? e.message : String(e),
@@ -64,7 +71,8 @@ export async function getUserPreferences(
 ): Promise<UserPreferences | null> {
   try {
     const data = await env.LINEAR_KV.get(`user_prefs:${userId}`, "json");
-    if (data && typeof data === "object") return data as UserPreferences;
+    if (!data) return null;
+    return UserPreferencesSchema.parse(data);
   } catch (e) {
     log.debug("kv.get_user_preferences_failed", {
       userId,
@@ -81,7 +89,8 @@ function getIssueSessionKey(issueId: string): string {
 export async function lookupIssueSession(env: Env, issueId: string): Promise<IssueSession | null> {
   try {
     const data = await env.LINEAR_KV.get(getIssueSessionKey(issueId), "json");
-    if (data && typeof data === "object") return data as IssueSession;
+    if (!data) return null;
+    return IssueSessionSchema.parse(data);
   } catch (e) {
     log.debug("kv.lookup_issue_session_failed", {
       issueId,
@@ -99,6 +108,50 @@ export async function storeIssueSession(
   await env.LINEAR_KV.put(getIssueSessionKey(issueId), JSON.stringify(session), {
     expirationTtl: 86400 * 7,
   });
+}
+
+// ─── Pending classification (elicitation flow) ──────────────────────────────
+
+export interface PendingClassification {
+  agentSessionId: string;
+  issueId: string;
+  issueIdentifier: string;
+  issueTitle: string;
+  issueDescription?: string | null;
+  issueUrl: string;
+  labels: string[];
+  projectName?: string | null;
+  organizationId: string;
+  appUserId?: string;
+  createdAt: number;
+}
+
+export async function storePendingClassification(
+  env: Env,
+  issueId: string,
+  pending: PendingClassification
+): Promise<void> {
+  await env.LINEAR_KV.put(`pending-classification:${issueId}`, JSON.stringify(pending), {
+    expirationTtl: 3600, // 1 hour TTL
+  });
+}
+
+export async function lookupPendingClassification(
+  env: Env,
+  issueId: string
+): Promise<PendingClassification | null> {
+  try {
+    const data = await env.LINEAR_KV.get(`pending-classification:${issueId}`, "json");
+    if (!data) return null;
+    return PendingClassificationSchema.parse(data);
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+export async function deletePendingClassification(env: Env, issueId: string): Promise<void> {
+  await env.LINEAR_KV.delete(`pending-classification:${issueId}`);
 }
 
 /**
