@@ -225,7 +225,7 @@ function resolveLinearIcon(icon: string | null | undefined): LucideIcon | string
 
 // ─── Scroll Fade Container ─────────────────────────────────────────────────────
 
-function ScrollFade({ children, className }: { children: ReactNode; className?: string }) {
+function ScrollFade({ children, borderClass, scrollClass }: { children: ReactNode; borderClass?: string; scrollClass?: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const [atTop, setAtTop] = useState(true);
   const [atBottom, setAtBottom] = useState(true);
@@ -256,10 +256,10 @@ function ScrollFade({ children, className }: { children: ReactNode; className?: 
         : "linear-gradient(to bottom, transparent 0%, black 24px, black calc(100% - 24px), transparent 100%)";
 
   return (
-    <div className={className}>
+    <div className={borderClass}>
       <div
         ref={ref}
-        className="overflow-y-auto h-full"
+        className={scrollClass}
         style={maskImage ? { maskImage, WebkitMaskImage: maskImage } : undefined}
       >
         {children}
@@ -450,7 +450,7 @@ function RepoMappingSection({
                   agent is authorized in your workspace.
                 </p>
               ) : (
-                <ScrollFade className="max-h-48 border border-border rounded-md divide-y divide-border">
+                <ScrollFade borderClass="border border-border rounded-md overflow-hidden" scrollClass="max-h-48 overflow-y-auto divide-y divide-border">
                   {sourceOptions.map((s) => {
                     const team = s as LinearTeam;
                     return (
