@@ -133,9 +133,7 @@ export const MODEL_OPTIONS: ModelCategory[] = [
   },
   {
     category: "OpenCode Go",
-    models: [
-      { id: "opencode-go/glm-5", name: "GLM 5 (Go)", description: "Z.ai 744B MoE" },
-    ],
+    models: [{ id: "opencode-go/glm-5", name: "GLM 5 (Go)", description: "Z.ai 744B MoE" }],
   },
 ];
 
