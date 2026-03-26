@@ -133,7 +133,8 @@ describe("getUserPreferences", () => {
   it("returns parsed preferences", async () => {
     const prefs = { userId: "user-1", model: "claude-opus-4-5", updatedAt: 123 };
     const { kv } = createFakeKV({ "user_prefs:user-1": JSON.stringify(prefs) });
-    expect(await getUserPreferences(makeEnv(kv), "user-1")).toEqual(prefs);
+    // Zod strips unknown fields (userId, updatedAt)
+    expect(await getUserPreferences(makeEnv(kv), "user-1")).toEqual({ model: "claude-opus-4-5" });
   });
 
   it("returns null when KV throws", async () => {

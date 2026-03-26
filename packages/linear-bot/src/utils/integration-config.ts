@@ -45,7 +45,8 @@ export async function getLinearConfig(env: Env, repo: string): Promise<ResolvedL
     return DEFAULT_CONFIG;
   }
 
-  const data = (await response.json()) as { config: ResolvedLinearConfig | null };
+  // TODO: full Zod schema for the nested config shape
+  const data = (await response.json()) as { config: ResolvedLinearConfig | null }; // intentional cast — complex nested config shape
   if (!data.config) {
     return DEFAULT_CONFIG;
   }

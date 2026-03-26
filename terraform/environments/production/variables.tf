@@ -202,6 +202,20 @@ variable "anthropic_api_key" {
   sensitive   = true
 }
 
+variable "opencode_zen_api_key" {
+  description = "OpenCode Zen API key (pay-as-you-go)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "opencode_go_api_key" {
+  description = "OpenCode Go API key (subscription)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
 # =============================================================================
 # Security Secrets
 # =============================================================================

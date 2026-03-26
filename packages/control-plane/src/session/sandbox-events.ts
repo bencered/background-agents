@@ -107,6 +107,18 @@ export class SessionSandboxEventProcessor {
         createdAt: now,
       });
       this.deps.broadcast({ type: "sandbox_event", event });
+
+      // Send tool_result callback to originating client (best-effort, throttled)
+      if (messageId) {
+        this.deps.ctx.waitUntil(
+          this.deps.callbackService.notifyToolResult(messageId, event).catch((error) => {
+            this.deps.log.error("callback.tool_result.background_error", {
+              message_id: messageId,
+              error,
+            });
+          })
+        );
+      }
       return;
     }
 

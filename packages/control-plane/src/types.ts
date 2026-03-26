@@ -61,6 +61,9 @@ export interface Env {
 
   // GitHub App secrets (for git operations)
   GITHUB_APP_ID?: string;
+  GITHUB_APP_SLUG?: string;
+  /** User ID of the app's [bot] account (from GET /users/<slug>[bot]), NOT the App ID. */
+  GITHUB_APP_BOT_ID?: string;
   GITHUB_APP_PRIVATE_KEY?: string;
   GITHUB_APP_INSTALLATION_ID?: string;
 

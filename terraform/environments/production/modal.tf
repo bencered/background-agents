@@ -36,7 +36,9 @@ module "modal_app" {
     {
       name = "llm-api-keys"
       values = {
-        ANTHROPIC_API_KEY = var.anthropic_api_key
+        ANTHROPIC_API_KEY      = var.anthropic_api_key
+        OPENCODE_ZEN_API_KEY   = var.opencode_zen_api_key
+        OPENCODE_GO_API_KEY    = var.opencode_go_api_key
       }
     },
     {

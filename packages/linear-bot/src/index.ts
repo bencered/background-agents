@@ -6,7 +6,8 @@
  */
 
 import { Hono } from "hono";
-import type { Env, UserPreferences, AgentSessionWebhook } from "./types";
+import type { Env, UserPreferences } from "./types";
+import type { AgentSessionEventWebhookPayload } from "@linear/sdk/webhooks";
 import {
   buildOAuthAuthorizeUrl,
   exchangeCodeForToken,
@@ -40,21 +41,6 @@ function isObjectRecord(value: unknown): value is Record<string, unknown> {
 function readStringField(record: Record<string, unknown>, key: string): string | null {
   const value = record[key];
   return typeof value === "string" ? value : null;
-}
-
-function isAgentSessionWebhookPayload(payload: unknown): payload is AgentSessionWebhook {
-  if (!isObjectRecord(payload)) return false;
-
-  const type = readStringField(payload, "type");
-  const action = readStringField(payload, "action");
-  const organizationId = readStringField(payload, "organizationId");
-  const agentSession = payload.agentSession;
-
-  if (!type || !action || !organizationId || !isObjectRecord(agentSession)) {
-    return false;
-  }
-
-  return typeof agentSession.id === "string";
 }
 
 // ─── Routes ──────────────────────────────────────────────────────────────────
@@ -130,33 +116,32 @@ app.post("/webhook", async (c) => {
   if (eventType === "AgentSessionEvent") {
     // Deduplicate: use agentSession.id + action as key
     const agentSession = isObjectRecord(payload.agentSession) ? payload.agentSession : undefined;
-    if (agentSession) {
-      const agentSessionId = readStringField(agentSession, "id");
-      if (!agentSessionId) {
-        log.warn("webhook.invalid_payload", {
-          trace_id: traceId,
-          reason: "missing_agent_session_id",
-        });
-        return c.json({ error: "Invalid payload" }, 400);
-      }
-
-      const eventKey = `${agentSessionId}:${action}`;
-      const isDuplicate = await isDuplicateEvent(c.env, eventKey);
-      if (isDuplicate) {
-        log.info("webhook.deduplicated", { trace_id: traceId, event_key: eventKey });
-        return c.json({ ok: true, skipped: true, reason: "duplicate" });
-      }
-    }
-
-    if (!isAgentSessionWebhookPayload(payload)) {
+    const agentSessionId = agentSession ? readStringField(agentSession, "id") : undefined;
+    if (!agentSessionId) {
       log.warn("webhook.invalid_payload", {
         trace_id: traceId,
-        reason: "invalid_agent_session_event_shape",
+        reason: "missing_agent_session_id",
       });
       return c.json({ error: "Invalid payload" }, 400);
     }
 
-    c.executionCtx.waitUntil(handleAgentSessionEvent(payload, c.env, traceId));
+    const eventKey = `${agentSessionId}:${action}`;
+    const isDuplicate = await isDuplicateEvent(c.env, eventKey);
+    if (isDuplicate) {
+      log.info("webhook.deduplicated", { trace_id: traceId, event_key: eventKey });
+      return c.json({ ok: true, skipped: true, reason: "duplicate" });
+    }
+
+    // Signature already verified by LinearWebhookClient — safe to cast
+    const webhook = payload as AgentSessionEventWebhookPayload;
+
+    log.info("webhook.agent_session_event", {
+      trace_id: traceId,
+      action,
+      agent_session_id: agentSessionId,
+    });
+
+    c.executionCtx.waitUntil(handleAgentSessionEvent(webhook, c.env, traceId));
 
     log.info("http.request", {
       trace_id: traceId,
@@ -224,7 +209,7 @@ app.get("/config/user-prefs/:userId", async (c) => {
 
 app.put("/config/user-prefs/:userId", async (c) => {
   const userId = c.req.param("userId");
-  const body = (await c.req.json()) as Partial<UserPreferences>;
+  const body: Partial<UserPreferences> = await c.req.json();
   const prefs: UserPreferences = {
     userId,
     model: body.model || c.env.DEFAULT_MODEL,
@@ -233,6 +218,54 @@ app.put("/config/user-prefs/:userId", async (c) => {
   };
   await c.env.LINEAR_KV.put(`user_prefs:${userId}`, JSON.stringify(prefs));
   return c.json({ ok: true });
+});
+
+// ─── Linear API Proxy Endpoints ──────────────────────────────────────────────
+// These expose Linear workspace data (teams/projects) for the UI via control plane.
+
+app.get("/config/teams", async (c) => {
+  try {
+    // Find the first stored org token
+    const list = await c.env.LINEAR_KV.list({ prefix: "oauth:token:" });
+    if (list.keys.length === 0) {
+      return c.json({ teams: [] });
+    }
+    const orgId = list.keys[0].name.replace("oauth:token:", "");
+
+    const { getLinearClient: _getLinearClient } = await import("./utils/linear-client");
+    const client = await _getLinearClient(c.env, orgId);
+    if (!client) return c.json({ teams: [] });
+
+    const teamsResult = await client.teams();
+    const teams = teamsResult.nodes.map((t) => ({ id: t.id, name: t.name, key: t.key }));
+    return c.json({ teams });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    log.error("config.teams_error", { error: msg });
+    return c.json({ teams: [] });
+  }
+});
+
+app.get("/config/projects", async (c) => {
+  try {
+    const list = await c.env.LINEAR_KV.list({ prefix: "oauth:token:" });
+    if (list.keys.length === 0) {
+      return c.json({ projects: [] });
+    }
+    const orgId = list.keys[0].name.replace("oauth:token:", "");
+
+    const { getLinearClient: _getLinearClient } = await import("./utils/linear-client");
+    const client = await _getLinearClient(c.env, orgId);
+    if (!client) return c.json({ projects: [] });
+
+    const projectsResult = await client.projects();
+    const projects = projectsResult.nodes.map((p) => ({ id: p.id, name: p.name }));
+    return c.json({ projects });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    log.error("config.projects_error", { error: msg });
+    return c.json({ projects: [] });
+  }
 });
 
 // Mount callbacks router
